@@ -64,10 +64,11 @@ class ModelSpaceTransformer:
         This importance is computed based on alpha and the train set. 
         For now, this only supports a linear kernel.
         """
-        if not (isinstance(model.kernel_, PairwiseKernel) and model.metric == "linear"):
-            msg = f"We only support PairwiseKernel(metric='linear'), not {type(model.kernel_)}"
+        if not (isinstance(model.kernel_, PairwiseKernel) and model.kernel_.metric == "linear"):
+            msg = f"We only support PairwiseKernel(metric='linear'), not {model.kernel_}"
             raise NotImplementedError(msg)
-        importances = (model.X_train_ * model.alpha_).sum(axis=0)
+        importances = (model.alpha_[:, None] * model.X_train_).sum(axis=0)
+        importances = np.abs(importances)
         mask = np.argsort(importances)[-100:]
         return X[:, mask]
     
