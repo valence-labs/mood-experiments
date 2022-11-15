@@ -2,10 +2,10 @@ import datamol as dm
 from rdkit.Chem import SaltRemover
 
 
-def standardize_smiles(smi, for_text_based_model: bool = False):
-    """A good default standardization function"""
+def standardize_smiles(smi, for_text_based_model: bool = False, disable_logs: bool = False):
+    """A good default standardization function for fingerprints and GNNs"""
     
-    with dm.without_rdkit_log():
+    with dm.without_rdkit_log(enable=disable_logs):
         mol = dm.to_mol(smi, ordered=True, sanitize=False)
         mol = dm.sanitize_mol(mol)
         

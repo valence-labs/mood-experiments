@@ -6,7 +6,7 @@ from typing import Union, Optional
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.gaussian_process import GaussianProcessRegressor, GaussianProcessClassifier
-from sklearn.gaussian_process.kernels import PairwiseKernel
+from sklearn.gaussian_process.kernels import PairwiseKernel, Sum
 
 from sklearn.preprocessing import OneHotEncoder
 
@@ -14,6 +14,10 @@ from sklearn.preprocessing import OneHotEncoder
 _SKLEARN_MLP_TYPE = Union[MLPRegressor, MLPClassifier]
 _SKLEARN_RF_TYPE = Union[RandomForestRegressor, RandomForestClassifier]
 _SKLEARN_GP_TYPE = Union[GaussianProcessRegressor, GaussianProcessClassifier]
+
+
+def is_linear_kernel(kernel):
+    return isinstance(kernel, PairwiseKernel) and kernel.metric == "linear"
 
 
 class ModelSpaceTransformer:
@@ -64,10 +68,34 @@ class ModelSpaceTransformer:
         This importance is computed based on alpha and the train set. 
         For now, this only supports a linear kernel.
         """
-        if not (isinstance(model.kernel_, PairwiseKernel) and model.kernel_.metric == "linear"):
-            msg = f"We only support PairwiseKernel(metric='linear'), not {model.kernel_}"
+        # Check the target type
+        is_regression = isinstance(model, GaussianProcessRegressor)
+        if not is_regression and model.n_classes_ != 2:
+            msg = f"We only support regression and binary classification"
+            raise ValueError(msg)
+            
+        # Check the kernel type
+        is_linear = (
+            is_linear_kernel(model.kernel_) or
+            isinstance(model.kernel_, Sum) and 
+            (
+                is_linear_kernel(model.kernel_.k1) or
+                is_linear_kernel(model.kernel_.k2)
+            )
+        )
+        if not is_linear:
+            msg = f"We only support the linear kernel, not {model.kernel_}"
             raise NotImplementedError(msg)
-        importances = (model.alpha_[:, None] * model.X_train_).sum(axis=0)
+        
+        if is_regression: 
+            importances = model.alpha_
+            X_train - model.X_train_
+        else:
+            est = model.base_estimator_
+            alpha = est.y_train_ - est.pi_
+            X_train = est.X_train_
+            
+        importances = (alpha[:, None] * X_train).sum(axis=0)
         importances = np.abs(importances)
         mask = np.argsort(importances)[-100:]
         return X[:, mask]
@@ -96,3 +124,4 @@ class ModelSpaceTransformer:
         
         # Return the activations of the second-to-last layer
         return activations[-2]
+    

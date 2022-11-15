@@ -1,7 +1,8 @@
 import datamol as dm
 import numpy as np
 
-from typing import Optional, Callable
+from functools import partial
+from typing import Optional, Callable, List
 from tdc.single_pred import ADME, Tox
 from tdc.metadata import dataset_names
 
@@ -23,10 +24,18 @@ TDC_TO_MOOD = {
 }
 MOOD_TO_TDC = {v: k for k, v in TDC_TO_MOOD.items()}
 MOOD_DATASETS = list(MOOD_TO_TDC.keys())
+MOOD_CLSF_DATASETS = ["BBB", "CYPP4502C9", "DILI", "HIA", "Pgp", "hERG"]
+MOOD_REGR_DATASETS = [d for d in MOOD_DATASETS if d not in MOOD_CLSF_DATASETS]
 
 
-def load_data_from_tdc(name: str, standardize_fn: Optional[Callable] = None):
+def load_data_from_tdc(
+    name: str, 
+    standardize_fn: Optional[Callable] = None,
+    progress: bool = True,
+    disable_logs: bool = False
+):
     
+    original_name = name
     if name in MOOD_TO_TDC:
         name = MOOD_TO_TDC[name]
     
@@ -38,17 +47,24 @@ def load_data_from_tdc(name: str, standardize_fn: Optional[Callable] = None):
     elif name.lower() in dataset_names["Tox"]:
         dataset = Tox(name=name, path=path)
     else: 
-        msg = f"{name} is not supported. Choose from {MOOD_DATASETS}."
+        msg = f"{original_name} is not supported. Choose from {MOOD_DATASETS}."
         raise RuntimeError(msg)
     
     # Standardize the SMILES
-    smiles = dataset.entity1.to_numpy()
-    smiles = np.array([dm.to_smiles(dm.to_mol(smi)) for smi in smiles])
+    with dm.without_rdkit_log(enable=disable_logs):
+        smiles = dataset.entity1
+        smiles = np.array([dm.to_smiles(dm.to_mol(smi)) for smi in smiles])
+    
     if standardize_fn is not None:
-        smiles = np.array(dm.utils.parallelized(standardize_fn, smiles))
+        fn = partial(standardize_fn, disable_logs=disable_logs) 
+        smiles = np.array(
+            dm.utils.parallelized(
+                fn, smiles, progress=progress, tqdm_kwargs={"desc": f"Preprocess {original_name}"}
+            )
+        )
 
     # Load the targets
-    y = dataset.y.to_numpy()
+    y = np.array(dataset.y)
     
     # Mask out NaN that might be the result of standardization
     mask = [i for i, x in enumerate(smiles) if x is not None]
@@ -58,6 +74,24 @@ def load_data_from_tdc(name: str, standardize_fn: Optional[Callable] = None):
     return smiles, y
 
 
-def dataset_iterator(standardize_fn: Optional[Callable] = None):
-    for name in MOOD_DATASETS:
-        yield name, load_data_from_tdc(name, standardize_fn)
+def dataset_iterator(
+    standardize_fn: Optional[Callable] = None, 
+    disable_logs: bool = True,
+    progress: bool = False,
+    whitelist: Optional[List[str]] = None,
+    blacklist: Optional[List[str]] = None,
+):
+    
+    if whitelist is not None and blacklist is not None: 
+        msg = "You cannot use a blacklist and whitelist at the same time"
+        raise ValueError(msg)
+    
+    all_datasets = MOOD_DATASETS
+    
+    if whitelist is not None: 
+        all_datasets = [d for d in all_datasets if d in whitelist]
+    if blacklist is not None: 
+        all_datasets = [d for d in all_datasets if d not in blacklist]
+    
+    for name in all_datasets:
+        yield name, load_data_from_tdc(name, standardize_fn, progress, disable_logs)
