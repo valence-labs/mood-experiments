@@ -52,3 +52,15 @@ def save_figure_with_fsspec(path, exist_ok=False):
         
         plt.savefig(lpath)
         dm.fs.copy_file(lpath, path, force=exist_ok)
+
+        
+def get_outlier_bounds(X, factor: float = 1.0):
+        
+    q1 = np.quantile(X, 0.25)
+    q3 = np.quantile(X, 0.75)
+    iqr = q3 - q1
+
+    lower = q1 - factor * iqr
+    upper = q3 + factor * iqr
+        
+    return lower, upper

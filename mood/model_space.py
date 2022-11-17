@@ -88,8 +88,8 @@ class ModelSpaceTransformer:
             raise NotImplementedError(msg)
         
         if is_regression: 
-            importances = model.alpha_
-            X_train - model.X_train_
+            alpha = model.alpha_
+            X_train = model.X_train_
         else:
             est = model.base_estimator_
             alpha = est.y_train_ - est.pi_
