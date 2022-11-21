@@ -141,3 +141,4 @@ multirun/
 src/
 notebooks/*.csv
 profile/
+argo/

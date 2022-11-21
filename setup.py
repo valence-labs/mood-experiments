@@ -21,7 +21,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "mood=mood.cli:main",
+            "mood=mood.__main__:app",
         ],
     },
 ) 
