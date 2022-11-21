@@ -50,8 +50,8 @@ def train_model(X, y, name: str, is_regression: bool):
     
     models = {
         "mlp": {
-            "regression":  MLPRegressor(hidden_layer_sizes=(128, 128, 128,), random_state=0),
-            "classification": MLPClassifier(hidden_layer_sizes=(128, 128, 128,), random_state=0),
+            "regression":  MLPRegressor(hidden_layer_sizes=(128, 128, X.shape[1],), random_state=0),
+            "classification": MLPClassifier(hidden_layer_sizes=(128, 128, X.shape[1],), random_state=0),
         },
         "rf": {
             "regression":  RandomForestRegressor(random_state=0),
@@ -69,7 +69,9 @@ def train_model(X, y, name: str, is_regression: bool):
 
 
 def get_model_space_distances(model, train, queries):
-    trans = ModelSpaceTransformer(model)
+    
+    embedding_size = int(round(train.shape[1] * 0.25))
+    trans = ModelSpaceTransformer(model, embedding_size)
 
     model_space_train = trans(train)
     queries = [trans(q) for q in queries]
@@ -108,32 +110,37 @@ def compute_correlations(input_spaces, model_spaces, labels):
 
 
 def cli(
-    base_save_dir: str = "gs://experiments-output/mood-v2/results/figures/",
+    base_save_dir: str = "gs://experiments-output/mood-v2/results/",
     overwrite: bool = False,
-    representation_whitelist: Optional[List[str]] = None,
-    dataset_whitelist: Optional[List[str]] = None,
+    representation: Optional[List[str]] = None,
+    dataset: Optional[List[str]] = None,
 ):
         
     today = datetime.now().strftime("%Y%m%d")
-    save_dir = dm.fs.join(base_save_dir, f"{today}_NB01")
-    logger.info(f"Saving results to {save_dir}")
+    fig_save_dir = dm.fs.join(base_save_dir, "figures", f"{today}_NB01")
+    dm.fs.mkdir(fig_save_dir, exist_ok=True)
+    logger.info(f"Saving figures to {fig_save_dir}")
     
-    corr_path = dm.fs.join(save_dir, "correlations.csv")
+    corr_save_dir = dm.fs.join(base_save_dir, "dataframes", f"{today}_NB01")
+    dm.fs.mkdir(corr_save_dir, exist_ok=True)
+    corr_path = dm.fs.join(corr_save_dir, "correlations.csv")
     if dm.fs.exists(corr_path) and not overwrite:
         raise typer.BadParameter(f"{corr_path} already exists. Specify --overwrite or --base-save-dir.")
-    
+    logger.info(f"Saving correlation dataframe to {corr_path}")
+
+        
     df_corr = pd.DataFrame()
     
-    if len(dataset_whitelist) == 0:
-        dataset_whitelist = None
-    if len(representation_whitelist) == 0:
-        representation_whitelist = None
+    if len(dataset) == 0:
+        dataset = None
+    if len(representation) == 0:
+        representation = None
 
-    dataset_it = dataset_iterator(standardize_smiles, progress=True, whitelist=dataset_whitelist)
+    dataset_it = dataset_iterator(standardize_smiles, progress=True, whitelist=dataset)
     
     for dataset, (smiles, y) in dataset_it:
         representation_it = representation_iterator(
-            smiles, n_jobs=-1, progress=True, whitelist=representation_whitelist
+            smiles, n_jobs=-1, progress=True, whitelist=representation
         )
 
         for representation, (X, mask) in representation_it:
@@ -155,7 +162,7 @@ def cli(
             
             ax = plot_distance_distributions(input_distances, labels=labels)
             ax.set_title(f"Input space ({representation}, {dataset})")
-            save_figure_with_fsspec(dm.fs.join(save_dir, f"{dataset}_{representation}_input_space.png"), exist_ok=overwrite)
+            save_figure_with_fsspec(dm.fs.join(fig_save_dir, f"{dataset}_{representation}_input_space.png"), exist_ok=overwrite)
             plt.close()
 
             # Distances in different model spaces
@@ -170,7 +177,7 @@ def cli(
                 ax = plot_distance_distributions(model_distances, labels=labels)
                 ax.set_title(f"{name} space ({representation}, {dataset})")
                 save_figure_with_fsspec(
-                    dm.fs.join(save_dir, f"{dataset}_{representation}_{name}_space.png"), 
+                    dm.fs.join(fig_save_dir, f"{dataset}_{representation}_{name}_space.png"), 
                     exist_ok=overwrite
                 )
                 plt.close()

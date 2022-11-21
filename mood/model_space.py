@@ -28,11 +28,11 @@ class ModelSpaceTransformer:
         _SKLEARN_GP_TYPE,
     ]
         
-    def __init__(self, model, n_jobs: Optional[int] = None):
+    def __init__(self, model, embedding_size: int):
         if not isinstance(model, self.SUPPORTED_TYPES):
             raise TypeError(f"{type(model)} is not supported")
         self._model = model
-        self._n_jobs = n_jobs
+        self._embedding_size = embedding_size
     
     def __call__(self, X):
         """Transforms a list of datapoints"""
@@ -50,18 +50,16 @@ class ModelSpaceTransformer:
         # type check in the constructor 
         raise NotImplementedError
         
-    @staticmethod
-    def get_rf_embedding(model, X):
+    def get_rf_embedding(self, model, X):
         """
         For a random forest, the model space embedding is given by
         a subset of 100 features that have the highest importance 
         """            
         importances = model.feature_importances_
-        mask = np.argsort(importances)[-100:]
+        mask = np.argsort(importances)[-self._embedding_size:]
         return X[:, mask]
     
-    @staticmethod
-    def get_gp_embedding(model, X):
+    def get_gp_embedding(self, model, X):
         """
         In a Gaussian Process, the model space embedding is given
         by a subset of 100 features that have the highest importance. 
@@ -97,11 +95,10 @@ class ModelSpaceTransformer:
             
         importances = (alpha[:, None] * X_train).sum(axis=0)
         importances = np.abs(importances)
-        mask = np.argsort(importances)[-100:]
+        mask = np.argsort(importances)[-self._embedding_size:]
         return X[:, mask]
     
-    @staticmethod
-    def get_mlp_embedding(model, X):
+    def get_mlp_embedding(self, model, X):
         """
         For an multi-layer perceptron, the model space embedding is given by 
         the activations of the second-to-last layer
@@ -123,5 +120,9 @@ class ModelSpaceTransformer:
         model._forward_pass(activations)
         
         # Return the activations of the second-to-last layer
-        return activations[-2]
+        hidden_rep = activations[-2]
+        
+        importances = model.coefs_[-1][:, 0]
+        mask = np.argsort(importances)[-self._embedding_size:]
+        return hidden_rep[:, mask]
     
