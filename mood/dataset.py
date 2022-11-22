@@ -9,25 +9,6 @@ from tdc.metadata import dataset_names
 from mood.constants import CACHE_DIR
 
 
-TDC_TO_MOOD = {
-    "BBB_Martins": "BBB",
-    "CYP2C9_Veith": "CYPP4502C9",
-    "Caco2_Wang": "Caco-2",
-    "Clearance_Hepatocyte_AZ": "Clearance", 
-    "DILI": "DILI",
-    "HIA_Hou": "HIA",
-    "Half_Life_Obach": "HalfLife",
-    "Lipophilicity_AstraZeneca": "Lipophilicity",
-    "PPBR_AZ": "PPBR", 
-    "Pgp_Broccatelli": "Pgp", 
-    "hERG": "hERG",
-}
-MOOD_TO_TDC = {v: k for k, v in TDC_TO_MOOD.items()}
-MOOD_DATASETS = list(MOOD_TO_TDC.keys())
-MOOD_CLSF_DATASETS = ["BBB", "CYPP4502C9", "DILI", "HIA", "Pgp", "hERG"]
-MOOD_REGR_DATASETS = [d for d in MOOD_DATASETS if d not in MOOD_CLSF_DATASETS]
-
-
 def load_data_from_tdc(
     name: str, 
     standardize_fn: Optional[Callable] = None,
@@ -95,3 +76,37 @@ def dataset_iterator(
     
     for name in all_datasets:
         yield name, load_data_from_tdc(name, standardize_fn, progress, disable_logs)
+
+
+TDC_TO_MOOD = {
+    "BBB_Martins": "BBB",
+    "CYP2C9_Veith": "CYPP4502C9",
+    "Caco2_Wang": "Caco-2",
+    "Clearance_Hepatocyte_AZ": "Clearance", 
+    "DILI": "DILI",
+    "HIA_Hou": "HIA",
+    "Half_Life_Obach": "HalfLife",
+    "Lipophilicity_AstraZeneca": "Lipophilicity",
+    "PPBR_AZ": "PPBR", 
+    "Pgp_Broccatelli": "Pgp", 
+    "hERG": "hERG",
+}
+
+# Ordered by size
+MOOD_DATASETS = [
+   'DILI',
+   'HIA',
+   'hERG',
+   'HalfLife',
+   'Caco-2',
+   'Clearance',
+   'Pgp',
+   'PPBR',
+   'BBB',
+   'Lipophilicity',
+   'CYPP4502C9'
+]
+
+MOOD_TO_TDC = {v: k for k, v in TDC_TO_MOOD.items()}
+MOOD_CLSF_DATASETS = ["BBB", "CYPP4502C9", "DILI", "HIA", "Pgp", "hERG"]
+MOOD_REGR_DATASETS = [d for d in MOOD_DATASETS if d not in MOOD_CLSF_DATASETS]
