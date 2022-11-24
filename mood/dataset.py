@@ -92,6 +92,20 @@ TDC_TO_MOOD = {
     "hERG": "hERG",
 }
 
+TDC_TO_METRIC = {
+    "BBB": "AUROC",
+    "CYPP4502C9": "AUPRC",
+    "Caco-2": "MAE",
+    "Clearance": "Spearman", 
+    "DILI": "AUROC",
+    "HIA": "AUROC",
+    "HalfLife": "Spearman",
+    "Lipophilicity": "MAE",
+    "PPBR": "MAE", 
+    "Pgp": "AUROC", 
+    "hERG": "AUROC",
+}
+
 # Ordered by size
 MOOD_DATASETS = [
    'DILI',

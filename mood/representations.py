@@ -42,31 +42,16 @@ def representation_iterator(
     
     for name in all_representations:
         
-        feats = featurize(smiles, name, n_jobs, progress, disable_logs)
-        
-        # Mask out invalid features
-        mask = [
-            i for i, a in enumerate(feats) 
-            if a is not None 
-            and ~np.isnan(a).any()
-        ]
-        
-        if mask_nan: 
-            feats = feats[mask]
-            
-        # If the array had any Nones, it would not be a proper
-        # 2D array so we convert to one here.
-        feats = np.stack(feats)
-        
-        if return_mask:
-            feats = feats, mask
+        feats = featurize(smiles, name, n_jobs, mask_nan, return_mask, progress, disable_logs)
         yield name, feats
 
 
 def featurize(
     smiles, 
     name,
-    n_jobs: Optional[int] = None, 
+    n_jobs: Optional[int] = None,
+    mask_nan: bool = True,
+    return_mask: bool = True,
     progress: bool = True,
     disable_logs: bool = False
 ):
@@ -80,8 +65,25 @@ def featurize(
     reprs = dm.utils.parallelized(
         fn, smiles, n_jobs=n_jobs, progress=progress, tqdm_kwargs={"desc": name}
     )
+    reprs = np.array(reprs)
     
-    return np.array(reprs)
+    # Mask out invalid features
+    mask = [
+        i for i, a in enumerate(reprs) 
+        if a is not None 
+        and ~np.isnan(a).any()
+    ]
+        
+    if mask_nan: 
+        reprs = reprs[mask]
+            
+    # If the array had any Nones, it would not be a proper
+    # 2D array so we convert to one here.
+    reprs = np.stack(reprs)
+        
+    if return_mask:
+        reprs = reprs, mask
+    return reprs
 
 
 def compute_whim(smi, disable_logs: bool = False):

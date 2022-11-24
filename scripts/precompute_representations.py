@@ -1,22 +1,28 @@
 import os
-import click 
+import typer
 
 import pandas as pd
 import datamol as dm
 
+from typing import Optional
 from mood.preprocessing import standardize_smiles
 from mood.representations import MOOD_REPRESENTATIONS, featurize
-from mood.constants import DOWNSTREAM_APPS_DATA_DIR
+from mood.constants import DOWNSTREAM_APPS_DATA_DIR, SUPPORTED_DOWNSTREAM_APPS
 
 
-@click.command()
-@click.option("--molecule-set", type=click.Choice(["optimization", "virtual_screening"]), required=True)
-@click.option("--representation", type=click.Choice(MOOD_REPRESENTATIONS), required=True)
-@click.option("--n-jobs", type=int)
-@click.option("--verbose/--silent", default=False)
-@click.option("--override/--no-override", default=False)
-def cli(molecule_set, representation, n_jobs, verbose, override): 
+def cli(
+    molecule_set: str, 
+    representation: str, 
+    n_jobs: Optional[int] = None, 
+    verbose: bool = False, 
+    override: bool = False
+): 
     
+    if molecule_set not in SUPPORTED_DOWNSTREAM_APPS:
+        raise typer.BadParameter(f"--molecule-set should be one of {SUPPORTED_DOWNSTREAM_APPS}.")
+    if representation not in MOOD_REPRESENTATIONS:
+        raise typer.BadParameter(f"--representation should be one of {MOOD_REPRESENTATIONS}.")
+
     in_path = dm.fs.join(DOWNSTREAM_APPS_DATA_DIR, f"{molecule_set}.csv")
     out_path = dm.fs.join(
         DOWNSTREAM_APPS_DATA_DIR, 
@@ -50,7 +56,3 @@ def cli(molecule_set, representation, n_jobs, verbose, override):
     
     # Save
     df[["unique_id", "representation"]].to_parquet(out_path)
-
-
-if __name__ == "__main__": 
-    cli()

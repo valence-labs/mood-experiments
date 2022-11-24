@@ -11,7 +11,7 @@ from mood.constants import DOWNSTREAM_APPS_DATA_DIR, CACHE_DIR
 
 
 def load_representation_for_downstream_application(
-    name, representation, update_cache: bool = False
+    name, representation, update_cache: bool = False, return_compound_ids: bool = False,
 ): 
     
     suffix = ["representations", name, f"{representation}.parquet"]
@@ -28,7 +28,35 @@ def load_representation_for_downstream_application(
     # We filter out feature vectors that are entirely None,
     # but individual features can still be NaN.
     mask = ~np.isnan(X).any(axis=1)
-    return X[mask]
+    
+    if not return_compound_ids:
+        return X[mask]
+    
+    indices = data[mask]["unique_id"].to_numpy()
+    return X[mask], indices
+
+
+def load_distances_for_downstream_application(
+    name, representation, dataset, update_cache: bool = False, return_compound_ids: bool = False,
+): 
+    
+    suffix = ["distances", name, dataset, f"{representation}.parquet"]
+    
+    lpath = dm.fs.join(CACHE_DIR, "downstream_applications", *suffix)
+    if not dm.fs.exists(lpath) or update_cache:
+        rpath = dm.fs.join(DOWNSTREAM_APPS_DATA_DIR, *suffix)
+        dm.fs.copy_file(rpath, lpath)
+    
+    data = pd.read_parquet(lpath)
+    
+    distances = data["distance"].to_numpy()
+    mask = ~np.isnan(distances)
+    
+    if not return_compound_ids:
+        return distances[mask]
+    
+    indices = data[mask]["unique_id"].to_numpy()
+    return distances[mask], indices
 
 
 def save_figure_with_fsspec(path, exist_ok=False):
@@ -54,13 +82,37 @@ def save_figure_with_fsspec(path, exist_ok=False):
         dm.fs.copy_file(lpath, path, force=exist_ok)
 
         
-def get_outlier_bounds(X, factor: float = 1.0):
+def get_outlier_bounds(X, factor: float = 1.5):
         
     q1 = np.quantile(X, 0.25)
     q3 = np.quantile(X, 0.75)
     iqr = q3 - q1
 
-    lower = q1 - factor * iqr
-    upper = q3 + factor * iqr
-        
+    lower = max(np.min(X), q1 - factor * iqr)
+    upper = min(np.max(X), q3 + factor * iqr)
+    
     return lower, upper
+
+
+def bin_with_overlap(data, filter_outliers: bool = True):
+    
+    if filter_outliers: 
+        minimum, maximum = get_outlier_bounds(data)
+        window_size = (maximum - minimum) / 10
+        yield minimum, np.nonzero(data <= minimum)[0]
+        
+    else: 
+        minimum = np.min(data)
+        maximum = np.max(data)
+        window_size = (maximum - minimum) / 10
+
+    assert minimum >= 0, "A distance cannot be lower than 0"
+    
+    x = minimum
+    step_size = window_size / 20
+    while x + window_size < maximum:
+        yield x + 0.5 * window_size, np.nonzero(np.logical_and(data >= x, data < x + window_size))[0]
+        x += step_size
+    
+    # Yield the rest data
+    yield x + ((maximum - x) / 2.0), np.nonzero(data >= x)[0]
