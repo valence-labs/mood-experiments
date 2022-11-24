@@ -1,9 +1,15 @@
 import optuna
 import numpy as np
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+import datamol as dm
+
+from scipy.stats import entropy
+
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, VotingRegressor, VotingClassifier
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.gaussian_process import GaussianProcessRegressor, GaussianProcessClassifier
 from sklearn.gaussian_process.kernels import PairwiseKernel, Sum, WhiteKernel
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.base import ClassifierMixin, clone
 
 from mood.metrics import compute_metric, get_metric_direction
 
@@ -32,11 +38,66 @@ def get_baseline_cls(name, is_regression):
     return data[name][target_type]
 
                          
-def get_baseline_model(name, is_regression, params, seed):
-    return get_baseline_cls(name, is_regression)(**params)
+def get_baseline_model(
+    name: str,
+    is_regression: bool,
+    params: dict,
+    for_uncertainty_estimation: bool = False,
+    ensemble_size: int = 10,
+):
+    model = get_baseline_cls(name, is_regression)(**params)
+    if for_uncertainty_estimation:
+        model = uncertainty_wrapper(model, ensemble_size)
+    return model
 
+
+def uncertainty_wrapper(model, ensemble_size: int = 10):
+    if isinstance(model, MLPClassifier) or isinstance(model, MLPRegressor):
+        models = []
+        for idx in range(ensemble_size):
+            model = clone(model)
+            model.set_params(random_state=model.random_state + idx)
+            models.append((f"mlp_{idx}", model))
+            
+        if isinstance(model, MLPClassifier):
+            model = VotingClassifier(models, voting="soft", n_jobs=-1)
+        else: 
+            model = VotingRegressor(models, n_jobs=-1)
+            
+    if isinstance(model, RandomForestClassifier) or isinstance(model, MLPClassifier):
+        model = CalibratedClassifierCV(model)
+    return model
+
+
+def predict_uncertainty(model, X):
+
+    if isinstance(model, ClassifierMixin):
+        proba = model.predict_proba(X)[:, 1]
+        x_0 = np.clip(proba, 1e-10, 1.0 - 1e-10)
+        x_1 = 1.0 - x_0
+        uncertainty = entropy([x_0, x_1], base=2)
     
-def train_model(X, y, name: str, is_regression: bool, params: dict, seed: int):
+    elif isinstance(model, GaussianProcessRegressor):
+        std = model.predict(X, return_std=True)[1]
+        uncertainty = std ** 2
+    
+    else: 
+        # VotingRegressor or RandomForestRegressor
+        preds = dm.utils.parallelized(lambda x: x.predict(X), model.estimators_, n_jobs=model.n_jobs)
+        uncertainty = np.var(preds, axis=0)
+
+    return uncertainty
+
+def train_model(
+    X, 
+    y, 
+    name: str, 
+    is_regression: bool, 
+    params: dict, 
+    seed: int, 
+    for_uncertainty_estimation: bool = False,
+    ensemble_size: int = 10
+):
     params["random_state"] = seed
     
     if name == "RF" and not is_regression:
@@ -44,7 +105,7 @@ def train_model(X, y, name: str, is_regression: bool, params: dict, seed: int):
     if name == "GP":
         params["kernel"], params = construct_kernel(is_regression, params)
         
-    model = get_baseline_model(name, is_regression, params, seed)
+    model = get_baseline_model(name, is_regression, params, for_uncertainty_estimation, ensemble_size)
     model.fit(X, y)
     return model
 
@@ -138,6 +199,8 @@ def tune_model(
     is_regression: bool, 
     metric: str, 
     global_seed: int,
+    for_uncertainty_estimation: bool = False,
+    ensemble_size: int = 10,
     n_trials: int = 100,
     n_startup_trials: int = 20,
 ):
@@ -145,7 +208,16 @@ def tune_model(
     def run_trial(trial):
         random_state = global_seed + trial.number
         params = suggest_baseline_hparams(name, is_regression, trial)
-        model = train_model(X_train, y_train, name, is_regression, params, random_state)
+        model = train_model(
+            X_train, 
+            y_train, 
+            name, 
+            is_regression, 
+            params, 
+            random_state, 
+            for_uncertainty_estimation, 
+            ensemble_size,
+        )
         y_pred = model.predict(X_test)
         score = compute_metric(y_pred, y_test, metric)
         return score

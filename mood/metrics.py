@@ -116,6 +116,10 @@ def get_metric(metric: str):
     raise NotImplementedError(f"{metric} is currently not a supported metric")
 
 
+def get_calibration_metric(is_regression: bool):
+    return "Spearman" if is_regression else "ECE"
+    
+    
 def is_better(metric: str, before: float, after: float):
     if get_metric_direction(metric) == "maximize":
         return before > after
