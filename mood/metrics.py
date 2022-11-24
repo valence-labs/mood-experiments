@@ -59,7 +59,7 @@ def weighted_mae(preds, target, sample_weights=None):
 
 def weighted_auprc(preds, target, sample_weights=None):
     if sample_weights is None:
-        return average_precision(preds=preds, target=target)
+        return binary_average_precision(preds=preds, target=target)
 
     # TorchMetrics does not actually support sample weights, so we rely on the sklearn implementation
     # https://github.com/Lightning-AI/metrics/issues/1098
