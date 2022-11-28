@@ -62,7 +62,7 @@ def cli(
         )
     
         # Compute the representation
-        logger.info(f"Precomputing {representation} representation")
+        logger.info(f"Precomputing Graphormer representation")
         feats = graphormer.batch_transform(graphormer, df["smiles"].values, batch_size=batch_size, n_jobs=None)
         
         df["representation"] = list(feats)
@@ -75,6 +75,7 @@ def cli(
         
     for dataset, (smiles, _) in dataset_iterator(progress=verbose, whitelist=dataset, disable_logs=True):
         
+        logger.info(f"Dataset {dataset}")
         out_path = dm.fs.join(
             DATASET_DATA_DIR,
             "representations", 
