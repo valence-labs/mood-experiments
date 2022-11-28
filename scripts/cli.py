@@ -1,8 +1,9 @@
 import typer
-from scripts.model_vs_input_space import cli as model_vs_input_space_cmd
-from scripts.performance_over_distance import cli as iid_ood_gap_cmd
+from scripts.compare_spaces import cli as model_vs_input_space_cmd
+from scripts.compare_performance import cli as iid_ood_gap_cmd
 from scripts.precompute_representations import cli as precompute_representation_cmd
 from scripts.precompute_distances import cli as precompute_distances_cmd
+from scripts.visualize_shift import cli as visualize_shift_cmd
 
 
 compare_app = typer.Typer(help="Various CLIs that involve comparing two things")
@@ -31,7 +32,15 @@ precompute_app.command(
 )(precompute_distances_cmd)
 
 
+visualize_app = typer.Typer(help="Various CLIs to visualize results")
+
+visualize_app.command(
+    name="shift",
+    help="Visualize the shift from train to downstream applications"
+)(visualize_shift_cmd)
+
                           
 app = typer.Typer(help="CLI for the various stand-alone scripts of MOOD")
 app.add_typer(compare_app, name="compare")
 app.add_typer(precompute_app, name="precompute")
+app.add_typer(visualize_app, name="visualize")

@@ -5,13 +5,11 @@ from functools import partial
 from typing import Optional, Callable, List
 from tdc.single_pred import ADME, Tox
 from tdc.metadata import dataset_names
-
 from mood.constants import CACHE_DIR
 
 
 def load_data_from_tdc(
     name: str, 
-    standardize_fn: Optional[Callable] = None,
     progress: bool = True,
     disable_logs: bool = False
 ):
@@ -35,14 +33,6 @@ def load_data_from_tdc(
     with dm.without_rdkit_log(enable=disable_logs):
         smiles = dataset.entity1
         smiles = np.array([dm.to_smiles(dm.to_mol(smi)) for smi in smiles])
-    
-    if standardize_fn is not None:
-        fn = partial(standardize_fn, disable_logs=disable_logs) 
-        smiles = np.array(
-            dm.utils.parallelized(
-                fn, smiles, progress=progress, tqdm_kwargs={"desc": f"Preprocess {original_name}"}
-            )
-        )
 
     # Load the targets
     y = np.array(dataset.y)
@@ -56,7 +46,6 @@ def load_data_from_tdc(
 
 
 def dataset_iterator(
-    standardize_fn: Optional[Callable] = None, 
     disable_logs: bool = True,
     progress: bool = False,
     whitelist: Optional[List[str]] = None,
@@ -75,7 +64,7 @@ def dataset_iterator(
         all_datasets = [d for d in all_datasets if d not in blacklist]
     
     for name in all_datasets:
-        yield name, load_data_from_tdc(name, standardize_fn, progress, disable_logs)
+        yield name, load_data_from_tdc(name, progress, disable_logs)
 
 
 TDC_TO_MOOD = {

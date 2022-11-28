@@ -2,6 +2,7 @@ import optuna
 import numpy as np
 import datamol as dm
 
+from typing import Optional
 from scipy.stats import entropy
 
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, VotingRegressor, VotingClassifier
@@ -93,12 +94,15 @@ def train_model(
     y, 
     name: str, 
     is_regression: bool, 
-    params: dict, 
-    seed: int, 
+    params: Optional[dict] = None, 
+    seed: Optional[int] = None, 
     for_uncertainty_estimation: bool = False,
     ensemble_size: int = 10
 ):
-    params["random_state"] = seed
+    if params is None: 
+        params = {}
+    if seed is not None:
+        params["random_state"] = seed
     
     if name == "RF" and not is_regression:
         params["class_weight"] = "balanced"

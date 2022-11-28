@@ -4,9 +4,11 @@ import typer
 import pandas as pd
 import datamol as dm
 
+from loguru import logger
+from functools import partial
 from typing import Optional
-from mood.preprocessing import standardize_smiles
-from mood.representations import MOOD_REPRESENTATIONS, featurize
+from mood.preprocessing import DEFAULT_PREPROCESSING
+from mood.representations import MOOD_REPRESENTATIONS, featurize, TEXTUAL_FEATURIZERS
 from mood.constants import DOWNSTREAM_APPS_DATA_DIR, SUPPORTED_DOWNSTREAM_APPS
 
 
@@ -14,6 +16,7 @@ def cli(
     molecule_set: str, 
     representation: str, 
     n_jobs: Optional[int] = None, 
+    batch_size: int = 16,
     verbose: bool = False, 
     override: bool = False
 ): 
@@ -35,24 +38,26 @@ def cli(
         raise ValueError(f"{out_path} already exists! Use --override to override!")
     
     # Load
+    logger.info(f"Loading SMILES from {in_path}")
     df = pd.read_csv(in_path)
-    
-    # Standardize the SMILES
-    df["smiles"] = dm.utils.parallelized(
-        standardize_smiles, 
-        df["canonical_smiles"].values, 
-        n_jobs=n_jobs, 
-        progress=verbose
-    )
+
+    # Standardization fn
+    standardize_fn = DEFAULT_PREPROCESSING[representation]
     
     # Compute the representation
+    logger.info(f"Precomputing {representation} representation")
     df["representation"] = list(featurize(
-        df["smiles"].values, 
+        df["canonical_smiles"].values, 
         representation, 
+        standardize_fn,
         n_jobs=n_jobs, 
         progress=verbose, 
+        batch_size=batch_size,
+        return_mask=False,
+        disable_logs=True,
     ))
     df = df[~pd.isna(df["representation"])]
     
     # Save
+    logger.info(f"Saving results to {out_path}")
     df[["unique_id", "representation"]].to_parquet(out_path)

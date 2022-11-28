@@ -11,10 +11,12 @@ from typing import List, Optional
 
 from scipy.stats import pearsonr, spearmanr
 from sklearn.metrics import r2_score
+from sklearn.gaussian_process.kernels import PairwiseKernel, Sum, WhiteKernel
+from sklearn.gaussian_process import GaussianProcessRegressor, GaussianProcessClassifier
 
 from mood.dataset import dataset_iterator, load_data_from_tdc, MOOD_REGR_DATASETS, MOOD_CLSF_DATASETS
 from mood.model_space import ModelSpaceTransformer
-from mood.preprocessing import standardize_smiles
+from mood.preprocessing import DEFAULT_PREPROCESSING
 from mood.distance import compute_knn_distance
 from mood.visualize import plot_distance_distributions
 from mood.representations import representation_iterator, featurize
@@ -89,6 +91,7 @@ def cli(
     overwrite: bool = False,
     representation: Optional[List[str]] = None,
     dataset: Optional[List[str]] = None,
+    batch_size: int = 16,
 ):
         
     today = datetime.now().strftime("%Y%m%d")
@@ -103,7 +106,6 @@ def cli(
         raise typer.BadParameter(f"{corr_path} already exists. Specify --overwrite or --base-save-dir.")
     logger.info(f"Saving correlation dataframe to {corr_path}")
 
-        
     df_corr = pd.DataFrame()
     
     if len(dataset) == 0:
@@ -111,11 +113,17 @@ def cli(
     if len(representation) == 0:
         representation = None
 
-    dataset_it = dataset_iterator(standardize_smiles, progress=True, whitelist=dataset)
+    dataset_it = dataset_iterator(progress=True, whitelist=dataset)
     
     for dataset, (smiles, y) in dataset_it:
+        
         representation_it = representation_iterator(
-            smiles, n_jobs=-1, progress=True, whitelist=representation
+            smiles, 
+            n_jobs=-1, 
+            progress=True, 
+            whitelist=representation, 
+            standardize_fn=DEFAULT_PREPROCESSING,
+            batch_size=batch_size,
         )
 
         for representation, (X, mask) in representation_it:
@@ -126,10 +134,10 @@ def cli(
             optimization = load_representation_for_downstream_application("optimization", representation)      
 
             is_regression = dataset in MOOD_REGR_DATASETS
-            mlp_model = train_model(X, y_repr, "mlp", is_regression)
-            rf_model = train_model(X, y_repr, "rf", is_regression)
+            mlp_model = train_model(X, y_repr, "MLP", is_regression)
+            rf_model = train_model(X, y_repr, "RF", is_regression)
             # We use a custom train function for GPs to include a retry system                
-            gp_model = train_gp(X, y_repr, "gp", is_regression)
+            gp_model = train_gp(X, y_repr, is_regression)
 
             # Distances in input spaces
             input_distances = compute_knn_distance(X, [X, optimization, virtual_screening], n_jobs=-1)

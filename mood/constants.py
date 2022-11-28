@@ -22,3 +22,7 @@ The two downstream applications we consider for MOOD as application areas of mol
 """
 SUPPORTED_DOWNSTREAM_APPS = ["virtual_screening", "optimization"]
 
+"""
+Where data related to specific datasets is saved
+"""
+DATASET_DATA_DIR = "gs://experiments-output/mood-v2/datasets/"

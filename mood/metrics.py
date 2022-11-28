@@ -74,7 +74,7 @@ METRIC_SYNONYMS = {
     ("auroc",): binary_auroc,
     ("auprc", "average_precision"): weighted_auprc,
     ("mean_absolute_error", "mae"): weighted_mae,
-    ("spearman", "spearman_corrcoef"): weighted_spearman,
+    ("spearman", "spearman_corrcoef"): weighted_spearman, 
 }
 
 METRIC_TYPES = {
@@ -82,6 +82,7 @@ METRIC_TYPES = {
     ("auprc", "average_precision"): "classification",
     ("mean_absolute_error", "mae"): "regression",
     ("spearman", "spearman_corrcoef"): "regression",
+    ("ece, expected_calibration_error"): "classification",
 }
 
 METRIC_DIRECTIONS = {
@@ -89,6 +90,7 @@ METRIC_DIRECTIONS = {
     ("auprc", "average_precision"): "maximize",
     ("mean_absolute_error", "mae"): "minimize",
     ("spearman", "spearman_corrcoef"): "maximize",
+    ("ece, expected_calibration_error"): "minimize",
 }
 
 

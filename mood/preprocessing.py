@@ -1,4 +1,5 @@
 import datamol as dm
+from functools import partial
 from rdkit.Chem import SaltRemover
 
 
@@ -18,3 +19,12 @@ def standardize_smiles(smi, for_text_based_model: bool = False, disable_logs: bo
             mol = remover.StripMol(mol, dontRemoveEverything=True)
             
     return dm.to_smiles(mol)
+
+
+DEFAULT_PREPROCESSING = {
+    "MACCS": partial(standardize_smiles, for_text_based_model=False), 
+    "ECFP6": partial(standardize_smiles, for_text_based_model=False),
+    "Desc2D": partial(standardize_smiles, for_text_based_model=False),
+    "WHIM": partial(standardize_smiles, for_text_based_model=False),
+    "ChemBERTa": partial(standardize_smiles, for_text_based_model=True),
+}

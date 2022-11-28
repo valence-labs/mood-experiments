@@ -20,6 +20,7 @@ from mood.baselines import tune_model, train_model, predict_uncertainty
 from mood.utils import bin_with_overlap, load_distances_for_downstream_application, get_outlier_bounds
 from mood.distance import compute_knn_distance
 from mood.metrics import compute_metric, get_metric_direction, compute_uncertainty_calibration, get_calibration_metric
+from mood.preprocessing import DEFAULT_PREPROCESSING
 
 
 def cli(
@@ -40,7 +41,11 @@ def cli(
     dm.fs.mkdir(out_dir, exist_ok=True)
     
     smiles, y = load_data_from_tdc(dataset)
-    X, mask = featurize(smiles, representation)
+    X, mask = featurize(
+        smiles, 
+        representation, 
+        standardize_fn=DEFAULT_PREPROCESSING[representation]
+    )
     y = y[mask]
     
     metric = TDC_TO_METRIC[dataset]

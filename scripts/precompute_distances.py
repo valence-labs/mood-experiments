@@ -11,6 +11,7 @@ from mood.representations import representation_iterator
 from mood.constants import DOWNSTREAM_APPS_DATA_DIR
 from mood.utils import load_representation_for_downstream_application
 from mood.distance import compute_knn_distance
+from mood.preprocessing import DEFAULT_PREPROCESSING
 
 
 def save(distances, compounds, molecule_set, dataset, representation, overwrite):
@@ -34,6 +35,8 @@ def cli(
     overwrite: bool = False,
     representation: Optional[List[str]] = None,
     dataset: Optional[List[str]] = None,
+    verbose: bool = False,
+    batch_size: int = 16,
 ): 
     
     if len(dataset) == 0:
@@ -41,9 +44,18 @@ def cli(
     if len(representation) == 0:
         representation = None
         
-    for dataset, (smiles, y) in dataset_iterator(standardize_smiles, progress=True, whitelist=dataset):
+    for dataset, (smiles, y) in dataset_iterator(progress=verbose, whitelist=dataset, disable_logs=True):
         
-        for representation, (X, mask) in representation_iterator(smiles, n_jobs=-1, progress=True, whitelist=representation):
+        it = representation_iterator(
+            smiles, 
+            standardize_fn=DEFAULT_PREPROCESSING,
+            n_jobs=-1, 
+            progress=True, 
+            whitelist=representation, 
+            disable_logs=True
+        )
+        
+        for representation, (X, mask) in it:
 
             y_repr = y[mask]
 

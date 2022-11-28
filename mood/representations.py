@@ -1,8 +1,11 @@
+import torch
+import tqdm
+
 import datamol as dm
 import numpy as np
 
 from collections import OrderedDict
-from typing import Optional, List
+from typing import Optional, List, Callable, Union, Dict
 from functools import partial
 from copy import deepcopy
 
@@ -16,10 +19,15 @@ from rdkit.Chem import rdPartialCharges
 from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem import AllChem
 
+from transformers import AutoTokenizer, AutoModelForMaskedLM
+
+
+_CHEMBERTA_HF_ID = "seyonec/PubChem10M_SMILES_BPE_450k"
 
 
 def representation_iterator(
     smiles, 
+    standardize_fn: Union[Callable, Dict[str, Callable]],
     n_jobs: Optional[int] = None, 
     progress: bool = True,
     mask_nan: bool = True,
@@ -27,6 +35,7 @@ def representation_iterator(
     disable_logs: bool = True,
     whitelist: Optional[List[str]] = None,
     blacklist: Optional[List[str]] = None,
+    batch_size: int = 16,
 ):
     
     if whitelist is not None and blacklist is not None: 
@@ -39,33 +48,57 @@ def representation_iterator(
         all_representations = [d for d in all_representations if d in whitelist]
     if blacklist is not None: 
         all_representations = [d for d in all_representations if d not in blacklist]
-    
-    for name in all_representations:
+    if not isinstance(standardize_fn, dict):
+        standardize_fn = {repr_: standardize_fn for repr_ in all_representations}
         
-        feats = featurize(smiles, name, n_jobs, mask_nan, return_mask, progress, disable_logs)
+    for name in all_representations:        
+        feats = featurize(
+            smiles, 
+            name, 
+            standardize_fn[name], 
+            n_jobs, 
+            mask_nan, 
+            return_mask, 
+            progress, 
+            disable_logs,
+            batch_size,
+        )
         yield name, feats
 
 
 def featurize(
     smiles, 
     name,
+    standardize_fn,
     n_jobs: Optional[int] = None,
     mask_nan: bool = True,
     return_mask: bool = True,
     progress: bool = True,
-    disable_logs: bool = False
+    disable_logs: bool = False, 
+    batch_size: int = 16,
 ):
     if name not in _REPR_TO_FUNC:
         msg = f"{name} is not supported. Choose from {MOOD_REPRESENTATIONS}"
         raise NotImplementedError(name)
     
+    fn = partial(standardize_fn, disable_logs=disable_logs) 
+    smiles = np.array(
+        dm.utils.parallelized(
+            fn, smiles, progress=progress, tqdm_kwargs={"desc": f"Preprocess {name}"}
+        )
+    )
+    
     fn = _REPR_TO_FUNC[name]
     fn = partial(fn, disable_logs=disable_logs)
     
-    reprs = dm.utils.parallelized(
-        fn, smiles, n_jobs=n_jobs, progress=progress, tqdm_kwargs={"desc": name}
-    )
-    reprs = np.array(reprs)
+    if name in BATCHED_FEATURIZERS:
+        reprs = fn(smiles, batch_size=batch_size)
+        
+    else:
+        reprs = dm.utils.parallelized(
+            fn, smiles, n_jobs=n_jobs, progress=progress, tqdm_kwargs={"desc": name}
+        )
+        reprs = np.array(reprs)
     
     # Mask out invalid features
     mask = [
@@ -201,6 +234,53 @@ def compute_maccs(smi, disable_logs: bool = False):
         return dm.to_fp(smi, fp_type="maccs")
 
 
+def compute_chemberta(smis, disable_logs: bool = False, batch_size: int = 16):
+    
+    # Batch the input
+    step_size = int(np.ceil(len(smis) / batch_size))
+    batched = np.array_split(smis, step_size)
+    
+    # Load the model
+    tokenizer = AutoTokenizer.from_pretrained(_CHEMBERTA_HF_ID)
+    model = AutoModelForMaskedLM.from_pretrained(_CHEMBERTA_HF_ID)
+    
+    # Use the GPU if it is available
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
+    model.eval()
+    
+    hidden_states = []
+    for batch in tqdm.tqdm(batched, desc="Batch"): 
+        
+        model_input = tokenizer(
+            batch.tolist(), 
+            return_tensors="pt", 
+            add_special_tokens=True, 
+            truncation=True,
+            padding=True,
+            max_length=512,
+        ).to(device)
+        
+        with torch.no_grad():
+            model_output = model(
+                model_input["input_ids"], 
+                attention_mask=model_input["attention_mask"], 
+                output_hidden_states=True,
+            )
+        
+        # We use mean aggregation of the different token embeddings
+        h = model_output.hidden_states[-1]
+        h = [h_[mask].mean(0) for h_, mask in zip(h, model_input["attention_mask"])]
+        h = torch.stack(h)
+        h = h.cpu().detach().numpy()
+
+        hidden_states.append(h)
+        
+    hidden_states = np.concatenate(hidden_states)
+    return hidden_states
+    
+
+
 # TODO: When adding Graphormer and ChemBERTa,
 #     ensure we use the appropiate preprocessing fn
 _REPR_TO_FUNC = {   
@@ -208,6 +288,9 @@ _REPR_TO_FUNC = {
     "ECFP6": compute_ecfp6,
     "Desc2D": compute_desc2d,
     "WHIM": compute_whim,
-}    
+    "ChemBERTa": compute_chemberta,
+}
 
 MOOD_REPRESENTATIONS = list(_REPR_TO_FUNC.keys())
+BATCHED_FEATURIZERS = ["ChemBERTa"]
+TEXTUAL_FEATURIZERS = ["ChemBERTa"]

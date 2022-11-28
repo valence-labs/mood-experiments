@@ -142,3 +142,6 @@ src/
 notebooks/*.csv
 profile/
 argo/
+
+# Would pollute the git repo a lot
+scripts/precompute_graphormer.py
