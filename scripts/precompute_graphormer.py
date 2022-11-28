@@ -29,7 +29,7 @@ STATE_DICT = {
 def cli(
     batch_size: int = 16,
     verbose: bool = False, 
-    override: bool = False
+    override: bool = False,
     skip: Optional[List[str]] = None,
 ): 
     
