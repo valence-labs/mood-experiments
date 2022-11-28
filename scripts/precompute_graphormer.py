@@ -43,7 +43,7 @@ def cli(
             DOWNSTREAM_APPS_DATA_DIR, 
             "representations", 
             molecule_set, 
-            f"{representation}.parquet"
+            f"Graphormer.parquet"
         )
 
         if dm.fs.exists(out_path) and not override: 
@@ -79,7 +79,7 @@ def cli(
             DATASET_DATA_DIR,
             "representations", 
             dataset, 
-            f"{representation}.parquet"
+            f"Graphormer.parquet"
         )
         
         if dm.fs.exists(out_path) and not override: 
