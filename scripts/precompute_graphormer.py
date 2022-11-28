@@ -10,7 +10,7 @@ from functools import partial
 from typing import Optional
 from mood.preprocessing import DEFAULT_PREPROCESSING
 from mood.representations import MOOD_REPRESENTATIONS, featurize, TEXTUAL_FEATURIZERS
-from mood.constants import DOWNSTREAM_APPS_DATA_DIR, DATASET_DATA_DIR
+from mood.constants import DOWNSTREAM_APPS_DATA_DIR, DATASET_DATA_DIR, SUPPORTED_DOWNSTREAM_APPS
 
 
 STATE_DICT = {
