@@ -11,7 +11,7 @@ from typing import Optional
 from mood.preprocessing import DEFAULT_PREPROCESSING
 from mood.representations import MOOD_REPRESENTATIONS, featurize, TEXTUAL_FEATURIZERS
 from mood.constants import DOWNSTREAM_APPS_DATA_DIR, DATASET_DATA_DIR, SUPPORTED_DOWNSTREAM_APPS
-
+from mood.dataset import dataset_iterator, MOOD_DATASETS
 
 STATE_DICT = {
     "_molfeat_version": "0.5.2",
@@ -30,13 +30,17 @@ def cli(
     batch_size: int = 16,
     verbose: bool = False, 
     override: bool = False
+    skip: Optional[List[str]] = None,
 ): 
     
+    if skip is None: 
+        skip = []
+        
     graphormer = MoleculeTransformer.from_state_dict(STATE_DICT)
     standardize_fn = partial(DEFAULT_PREPROCESSING["Graphormer"], disable_logs=True)
 
     # Precompute Graphormer for the downstream applications
-    for molecule_set in SUPPORTED_DOWNSTREAM_APPS:
+    for molecule_set in [app for app in SUPPORTED_DOWNSTREAM_APPS if app not in skip]:
         
         in_path = dm.fs.join(DOWNSTREAM_APPS_DATA_DIR, f"{molecule_set}.csv")
         out_path = dm.fs.join(
@@ -72,8 +76,9 @@ def cli(
         logger.info(f"Saving results to {out_path}")
         df[["unique_id", "representation"]].to_parquet(out_path)
         
-        
-    for dataset, (smiles, _) in dataset_iterator(progress=verbose, whitelist=dataset, disable_logs=True):
+    
+    blacklist = [app for app in MOOD_DATASETS if app in skip]
+    for dataset, (smiles, _) in dataset_iterator(progress=verbose, blacklist=blacklist, disable_logs=True):
         
         logger.info(f"Dataset {dataset}")
         out_path = dm.fs.join(
