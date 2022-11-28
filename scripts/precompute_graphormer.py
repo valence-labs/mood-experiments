@@ -33,7 +33,7 @@ def cli(
 ): 
     
     graphormer = MoleculeTransformer.from_state_dict(STATE_DICT)
-    standardize_fn = DEFAULT_PREPROCESSING["Graphormer"]
+    standardize_fn = partial(DEFAULT_PREPROCESSING["Graphormer"], disable_logs=True)
 
     # Precompute Graphormer for the downstream applications
     for molecule_set in SUPPORTED_DOWNSTREAM_APPS:
