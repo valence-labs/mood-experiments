@@ -27,4 +27,5 @@ DEFAULT_PREPROCESSING = {
     "Desc2D": partial(standardize_smiles, for_text_based_model=False),
     "WHIM": partial(standardize_smiles, for_text_based_model=False),
     "ChemBERTa": partial(standardize_smiles, for_text_based_model=True),
+    "Graphormer": partial(standardize_smiles, for_text_based_model=False),
 }
