@@ -7,7 +7,7 @@ from molfeat.trans.base import MoleculeTransformer
 
 from loguru import logger
 from functools import partial
-from typing import Optional
+from typing import Optional, List
 from mood.preprocessing import DEFAULT_PREPROCESSING
 from mood.representations import MOOD_REPRESENTATIONS, featurize, TEXTUAL_FEATURIZERS
 from mood.constants import DOWNSTREAM_APPS_DATA_DIR, DATASET_DATA_DIR, SUPPORTED_DOWNSTREAM_APPS
