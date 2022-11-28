@@ -23,7 +23,7 @@ STATE_DICT = {
         "version": None,
     },
     "name": "GraphormerTransformer",
-},
+}
 
 
 def cli(
