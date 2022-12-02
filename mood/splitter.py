@@ -3,20 +3,41 @@ import tqdm
 import numpy as np
 import datamol as dm
 import seaborn as sns
+import pandas as pd
 import matplotlib.pyplot as plt
-
 from matplotlib.cm import ScalarMappable
+
+from sklearn.model_selection import ShuffleSplit
 from dataclasses import dataclass
 from loguru import logger
 from collections import defaultdict
 from typing import Union, List, Optional, Callable, Dict
 
 from scipy.stats import wasserstein_distance
+from sklearn.metrics import pairwise_distances
 from sklearn.neighbors import NearestNeighbors
 from sklearn.model_selection import BaseShuffleSplit, GroupShuffleSplit
-from sklearn.cluster import KMeans
+from sklearn.model_selection._split import _validate_shuffle_split, _num_samples
+from sklearn.cluster import MiniBatchKMeans
 
+from mood.transformer import EmpiricalKernelMapTransformer
+from mood.distance import get_metric
+from mood.visualize import plot_distance_distributions
+from mood.utils import get_outlier_bounds
+
+
+def get_mood_splitters(smiles, n_splits: int = 5, random_state: int = 5):
     
+    scaffolds = [dm.to_smiles(dm.to_scaffold_murcko(dm.to_mol(smi))) for smi in smiles]
+    splitters = {
+        "Random": ShuffleSplit(n_splits=n_splits, random_state=random_state),
+        "Scaffold": PredefinedGroupShuffleSplit(groups=scaffolds, n_splits=n_splits, random_state=random_state),
+        "Perimeter": PerimeterSplit(n_clusters=25, n_splits=n_splits, random_state=random_state),
+        "K-Means (5)": KMeansSplit(n_clusters=25, n_splits=n_splits, random_state=random_state),
+    }
+    return splitters
+    
+
 @dataclass
 class SplitCharacterization:
     """
@@ -41,6 +62,26 @@ class SplitCharacterization:
     @staticmethod
     def best(splits):
         return max(splits, key=lambda spl: spl.representativeness)
+    
+    @staticmethod
+    def as_dataframe(splits):
+        df = pd.DataFrame()
+        best = SplitCharacterization.best(splits)
+        for split in splits: 
+            df_ = pd.DataFrame({
+                "split": split.label, 
+                "representativeness": split.representativeness,
+                "best": split == best,
+            }, index=[0])
+            df = pd.concat((df, df_), ignore_index=True)
+        df["rank"] = df["representativeness"].rank(ascending=False)
+        return df
+    
+    def __eq__(self, other):
+        return (
+            self.label == other.label and 
+            self.representativeness == other.representativeness
+        )
     
     def __repr__(self):
         return self.__str__()
@@ -87,51 +128,36 @@ class MOODSplitter(BaseShuffleSplit):
         self._splitters = splitters
         self._downstream_distances = downstream_distances
         
-        self._prescribed_splitter = None
+        self._split_chars = None
+        self._prescribed_splitter_label = None
 
     @staticmethod
-    def visualize(downstream_distances: np.ndarray, splits: List[SplitCharacterization]):
-        fig, ax = plt.subplots(figsize=(12, 6))
-        
-        ax.spines["right"].set_visible(False)
-        ax.spines["left"].set_visible(False)
-        ax.spines["top"].set_visible(False)
-        ax.yaxis.set_ticklabels([])
-        ax.yaxis.set_ticks([])
-        
-        cmap = sns.color_palette("rocket", len(splits) + 1)
+    def visualize(downstream_distances: np.ndarray, splits: List[SplitCharacterization]):        
         splits = sorted(splits, key=lambda spl: spl.representativeness)
+        cmap = sns.color_palette("rocket", len(splits) + 1)
         
-        # Visualize the distribution of the downstream application
-        sns.kdeplot(
-            downstream_distances, 
-            color=cmap[0], 
-            alpha=0.2, 
-            linestyle="--", 
-            label="Downstream application",
-        )
+        distances = [spl.distances for spl in splits]
+        colors = [cmap[rank + 1] for rank, spl in enumerate(splits)]
+        labels = [spl.label for spl in splits]
         
-        # Visualize all splitting methods
-        for rank, spl in enumerate(splits): 
-            sns.kdeplot(spl.distances, color=cmap[rank + 1], ax=ax, label=spl.label)
-        ax.set_xlabel(f"Distance")
-        ax.legend()
+        ax = plot_distance_distributions(distances, labels, colors)
         
-        # Add a colorbar
-        cbar = fig.colorbar(ScalarMappable(cmap="rocket"))
-        cbar.set_label("Representativeness to downstream application (Rank)", rotation=270, labelpad=15)
+        lower, upper = get_outlier_bounds(downstream_distances, factor=3.0)
+        mask = (downstream_distances >= lower) & (downstream_distances <= upper)
+        downstream_distances = downstream_distances[mask]
         
+        sns.kdeplot(downstream_distances, color=cmap[0], linestyle="--", alpha=0.3, ax=ax)
         return ax
     
     @property
-    def get_prescribed_splitter():
+    def prescribed_splitter_label(self):
         if not self.fitted:
             raise RuntimeError("The splitter has not be fitted yet")
-        return self._prescribed_splitter
+        return self._prescribed_splitter_label
     
     @property
     def fitted(self):
-        return self._prescribed_splitter is not None
+        return self._prescribed_splitter_label is not None
    
     def _compute_distance(self, X_from, X_to):
         """
@@ -145,6 +171,12 @@ class MOODSplitter(BaseShuffleSplit):
         distances, ind = knn.kneighbors(X_from)
         distances = np.mean(distances, axis=1)
         return distances
+    
+    def get_prescribed_splitter(self):
+        return self.splitters[self.prescribed_splitter_label]
+    
+    def get_protocol_results(self):
+        return SplitCharacterization.as_dataframe(self._split_chars)
     
     def score_representativeness(self, distances):
         """Scores a representativeness score between two distributions
@@ -184,7 +216,7 @@ class MOODSplitter(BaseShuffleSplit):
             # We possibly repeat the split multiple times to 
             # get a more reliable  estimate
             chars = []
-
+            
             it_ = splitter.split(X, y, groups)
             if progress:
                 it_ = tqdm.tqdm(it_, leave=False, desc="Split", total=self._n_splits)
@@ -192,6 +224,9 @@ class MOODSplitter(BaseShuffleSplit):
             for split in it_:
                 train, test = split
                 distances = self._compute_distance(X[test], X[train])
+                distances = distances[np.isfinite(distances)]
+                distances = distances[~np.isnan(distances)]
+                
                 score = self.score_representativeness(distances)
                 chars.append(SplitCharacterization(distances, score, name))
             
@@ -200,7 +235,9 @@ class MOODSplitter(BaseShuffleSplit):
         # Rank different splitting methods by their ability to 
         # replicate the downstream distance distribution.
         chosen = SplitCharacterization.best(split_chars)
-        self._prescribed_splitter = self._splitters[chosen.label]
+        
+        self._split_chars = split_chars
+        self._prescribed_splitter_label = chosen.label
         
         logger.info(f"Selected {chosen.label} as the most representative splitting method")
         
@@ -238,14 +275,13 @@ class PredefinedGroupShuffleSplit(GroupShuffleSplit):
         yield from super()._iter_indices(X, y, self._groups)
 
 
-class KMeanSplit(GroupShuffleSplit):
+class KMeansSplit(GroupShuffleSplit):
     """Split based on the k-Mean clustering in input space"""
     
     def __init__(
         self, 
-        metric: str = "euclidean", 
         n_clusters: int = 10, 
-        n_splits=5, 
+        n_splits: int = 5,
         *, 
         test_size=None, 
         train_size=None, 
@@ -258,17 +294,117 @@ class KMeanSplit(GroupShuffleSplit):
             train_size=train_size,
             random_state=random_state,
         )
-        self._metric = metric
         self._n_clusters = n_clusters
+    
+    def compute_kmeans_clustering(self, X, random_state_offset: int = 0, return_centers: bool = False):
+        metric = get_metric(X)
+        seed = self.random_state + random_state_offset
         
+        if metric != "euclidean":
+            logger.info(f"To use KMeans with the {metric} metric, we use the Empirical Kernel Map")
+            transformer = EmpiricalKernelMapTransformer(
+                n_samples=min(512, len(X)), 
+                metric=metric, 
+                random_state=seed,
+            )
+            X = transformer(X)
+        
+        model = MiniBatchKMeans(self._n_clusters, random_state=seed, compute_labels=True)
+        model.fit(X)
+        
+        indices = model.labels_
+        if not return_centers:
+            return indices
+        
+        centers = model.cluster_centers_[indices]
+        return indices, centers
+
         
     def _iter_indices(self, X=None, y=None, groups=None):
         """Generate (train, test) indices"""
         if groups is not None: 
             logger.warning("Ignoring the groups parameter in favor of the predefined groups")
-        
-        model = KMeans(self._n_clusters)
-        model.fit(X)
-        groups = model.labels_
-        
+        groups = self.compute_kmeans_clustering(X)
         yield from super()._iter_indices(X, y, groups)
+
+
+class PerimeterSplit(KMeansSplit):
+    """
+    Places the pairs of data points with maximal pairwise distance in the test set.
+    This was originally called the extrapolation-oriented split, introduced in  Szántai-Kis et. al., 2003
+    """
+
+    def __init__(
+        self, 
+        n_clusters: int = 10, 
+        n_splits: int = 5,
+        n_jobs: Optional[int] = None, 
+        *, 
+        test_size=None, 
+        train_size=None, 
+        random_state=None
+    ):
+        
+        super().__init__(
+            n_clusters=n_clusters,
+            n_splits=n_splits,
+            test_size=test_size,
+            train_size=train_size,
+            random_state=random_state,
+        )
+        self._n_jobs = n_jobs
+
+    def _iter_indices(self, X, y=None, groups=None):
+
+        if groups is not None: 
+            logger.warning("Ignoring the groups parameter in favor of the predefined groups")
+        
+        metric = get_metric(X)
+
+        n_samples = _num_samples(X)
+        n_train, n_test = _validate_shuffle_split(
+            n_samples,
+            self.test_size,
+            self.train_size,
+            default_test_size=self._default_test_size,
+        )
+        
+        for i in range(self.n_splits):
+            
+            groups, centers = self.compute_kmeans_clustering(X, random_state_offset=i, return_centers=True)
+            centers, group_indices, group_counts = np.unique(centers, return_inverse=True, return_counts=True, axis=0)
+            groups_set = np.unique(group_indices)
+            
+            distance_matrix = pairwise_distances(centers, metric=metric, n_jobs=self._n_jobs)
+
+            # Sort the distance matrix to find the groups that are the furthest away from one another
+            tril_indices = np.tril_indices_from(distance_matrix, k=-1)
+            maximum_distance_indices = np.argsort(distance_matrix[tril_indices])[::-1]
+
+            test_indices = []
+            remaining = set(groups_set)
+                
+            for pos in maximum_distance_indices:
+                
+                if len(test_indices) >= n_test:
+                    break
+
+                i, j = (
+                    tril_indices[0][pos],
+                    tril_indices[1][pos],
+                )
+
+                # If one of the molecules in this pair is already in the test set, skip to the next
+                if not (i in remaining and j in remaining):
+                    continue
+
+                remaining.remove(i)
+                test_indices.extend(list(np.flatnonzero(group_indices == groups_set[i])))
+                remaining.remove(j)
+                test_indices.extend(list(np.flatnonzero(group_indices == groups_set[j])))
+
+            train_indices = []
+            for i in remaining:
+                train_indices.extend(list(np.flatnonzero(group_indices == groups_set[i])))
+
+            yield np.array(train_indices), np.array(test_indices)

@@ -36,8 +36,8 @@ def cli(
 ):
     
     if sub_save_dir is None:
-        sub_save_dir = f"{datetime.now().strftime('%Y%m%d')}_NB02"
-    out_dir = dm.fs.join(base_save_dir, "dataframes", sub_save_dir)
+        sub_save_dir = datetime.now().strftime('%Y%m%d')
+    out_dir = dm.fs.join(base_save_dir, "dataframes", "compare_performance", sub_save_dir)
     dm.fs.mkdir(out_dir, exist_ok=True)
     
     smiles, y = load_data_from_tdc(dataset)

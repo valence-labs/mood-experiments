@@ -88,18 +88,21 @@ def compute_correlations(input_spaces, model_spaces, labels):
 
 def cli(
     base_save_dir: str = DOWNSTREAM_RESULTS_DIR,
+    sub_save_dir: Optional[str] = None,
     overwrite: bool = False,
     representation: Optional[List[str]] = None,
     dataset: Optional[List[str]] = None,
     batch_size: int = 16,
 ):
+    
+    if sub_save_dir is None: 
+        sub_save_dir = datetime.now().strftime("%Y%m%d")
         
-    today = datetime.now().strftime("%Y%m%d")
-    fig_save_dir = dm.fs.join(base_save_dir, "figures", f"{today}_NB01")
+    fig_save_dir = dm.fs.join(base_save_dir, "figures", "compare_spaces", sub_save_dir)
     dm.fs.mkdir(fig_save_dir, exist_ok=True)
     logger.info(f"Saving figures to {fig_save_dir}")
     
-    corr_save_dir = dm.fs.join(base_save_dir, "dataframes", f"{today}_NB01")
+    corr_save_dir = dm.fs.join(base_save_dir, "dataframes", "compare_spaces", sub_save_dir)
     dm.fs.mkdir(corr_save_dir, exist_ok=True)
     corr_path = dm.fs.join(corr_save_dir, "correlations.csv")
     if dm.fs.exists(corr_path) and not overwrite:

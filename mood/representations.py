@@ -1,9 +1,11 @@
 import torch
 import tqdm
 
+import pandas as pd
 import datamol as dm
 import numpy as np
 
+from loguru import logger
 from collections import OrderedDict
 from typing import Optional, List, Callable, Union, Dict
 from functools import partial
@@ -20,6 +22,8 @@ from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem import AllChem
 
 from transformers import AutoTokenizer, AutoModelForMaskedLM
+from mood.constants import DATASET_DATA_DIR 
+from mood.utils import get_mask_for_distances_or_representations
 
 
 _CHEMBERTA_HF_ID = "seyonec/PubChem10M_SMILES_BPE_450k"
@@ -101,12 +105,10 @@ def featurize(
         reprs = np.array(reprs)
     
     # Mask out invalid features
-    mask = [
-        i for i, a in enumerate(reprs) 
-        if a is not None 
-        and ~np.isnan(a).any()
-    ]
-        
+    mask = get_mask_for_distances_or_representations(reprs)
+    
+    logger.info(f"Succesfully computed representations for {len(reprs[mask])}/{len(smiles)} compounds")
+    
     if mask_nan: 
         reprs = reprs[mask]
             
@@ -124,6 +126,9 @@ def compute_whim(smi, disable_logs: bool = False):
     Compute a WHIM descriptor from a RDkit molecule object
     Code adapted from MoleculeACE, Van Tilborg et al. (2022)
     """
+    
+    smi = dm.to_smiles(dm.keep_largest_fragment(dm.to_mol(smi)))
+    
     with dm.without_rdkit_log(enable=disable_logs):
         mol = dm.to_mol(smi)
         if mol is None:
@@ -278,19 +283,41 @@ def compute_chemberta(smis, disable_logs: bool = False, batch_size: int = 16):
         
     hidden_states = np.concatenate(hidden_states)
     return hidden_states
+
+
+def load_graphormer(smis, disable_logs: bool = False, batch_size: int = 16):
+
+    # NOTE: Since we needed to make some changes to the Graphormer repo
+    #  to actually extract the embeddings, including that code in MOOD 
+    #  would pollute the repo quite a bit. Therefore, we precomputed the 
+    #  representations and just load these here.
+    
+    pattern = dm.fs.join(DATASET_DATA_DIR, "representations", "**", "*.parquet")
+    paths = dm.fs.glob(pattern)
+    df_repr = pd.concat([pd.read_parquet(p) for p in paths])
+    
+    unique_ids = dm.utils.parallelized(dm.unique_id, smis, progress=True)
+    df = pd.DataFrame(index=unique_ids)
+    
+    df_repr = df_repr[df_repr["unique_id"].isin(unique_ids)]
+    df_repr = df_repr.set_index("unique_id")
+    df = df.join(df_repr)
+    df = df[~df.index.duplicated(keep='first')]
+    
+    feats = df["representation"].to_numpy()
+    return feats
     
 
 
-# TODO: When adding Graphormer and ChemBERTa,
-#     ensure we use the appropiate preprocessing fn
 _REPR_TO_FUNC = {   
     "MACCS": compute_maccs, 
     "ECFP6": compute_ecfp6,
     "Desc2D": compute_desc2d,
     "WHIM": compute_whim,
     "ChemBERTa": compute_chemberta,
+    "Graphormer": load_graphormer,
 }
 
 MOOD_REPRESENTATIONS = list(_REPR_TO_FUNC.keys())
-BATCHED_FEATURIZERS = ["ChemBERTa"]
+BATCHED_FEATURIZERS = ["ChemBERTa", "Graphormer"]
 TEXTUAL_FEATURIZERS = ["ChemBERTa"]

@@ -25,9 +25,7 @@ def load_representation_for_downstream_application(
     
     X = np.stack(data["representation"].values)
     
-    # We filter out feature vectors that are entirely None,
-    # but individual features can still be NaN.
-    mask = ~np.isnan(X).any(axis=1)
+    mask = get_mask_for_distances_or_representations(X)
     
     if not return_compound_ids:
         return X[mask]
@@ -50,7 +48,7 @@ def load_distances_for_downstream_application(
     data = pd.read_parquet(lpath)
     
     distances = data["distance"].to_numpy()
-    mask = ~np.isnan(distances)
+    mask = get_mask_for_distances_or_representations(distances) 
     
     if not return_compound_ids:
         return distances[mask]
@@ -116,3 +114,20 @@ def bin_with_overlap(data, filter_outliers: bool = True):
     
     # Yield the rest data
     yield x + ((maximum - x) / 2.0), np.nonzero(data >= x)[0]
+
+    
+def get_mask_for_distances_or_representations(X):
+    
+    # The 1e4 threshold is somewhat arbitrary, but manually chosen to 
+    # filter out compounds that don't make sense (and are outliers).
+    # (e.g. WHIM for [C-]#N.[C-]#N.[C-]#N.[C-]#N.[C-]#N.[Fe+4].[N-]=O)
+    # Propagating such high-values would cause issues in downstream 
+    # functions (e.g. KMeans)
+    mask = [
+        i for i, a in enumerate(X) 
+        if a is not None 
+        and ~np.isnan(a).any()
+        and np.isfinite(a).all()
+        and ~(a > 1e4).any()
+    ]
+    return mask

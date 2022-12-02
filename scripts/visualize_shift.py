@@ -23,7 +23,10 @@ def cli(
     X, mask = featurize(smiles, representation, standardize_fn, disable_logs=True)
     y = y[mask]
     
+    logger.info(f"Loading precomputed representations for virtual screening")
     virtual_screening = load_representation_for_downstream_application("virtual_screening", representation)
+    
+    logger.info(f"Loading precomputed representations for optimization")
     optimization = load_representation_for_downstream_application("optimization", representation)      
     
     if model_space is not None:
@@ -37,8 +40,11 @@ def cli(
         X = trans(X)
         virtual_screening = trans(virtual_screening)
         optimization = trans(optimization)
-        
+    
+    logger.info("Computing the k-NN distance")
     distances = compute_knn_distance(X, [X, optimization, virtual_screening], n_jobs=-1)
+    
+    logger.info("Plotting the results")
     labels = ["Train", "Optimization", "Virtual Screening"]
     ax = plot_distance_distributions(distances, labels=labels)
     plt.show()
