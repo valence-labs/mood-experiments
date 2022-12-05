@@ -115,11 +115,6 @@ def cli(
     logger.info(f"Saving correlation dataframe to {corr_path}")
 
     df_corr = pd.DataFrame()
-    
-    if len(dataset) == 0:
-        dataset = None
-    if len(representation) == 0:
-        representation = None
 
     dataset_it = dataset_iterator(progress=True, blacklist=skip_dataset)
     
