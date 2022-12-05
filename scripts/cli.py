@@ -11,7 +11,7 @@ from scripts.visualize_splits import cli as visualize_splits_cmd
 compare_app = typer.Typer(help="Various CLIs that involve comparing two things")
 
 compare_app.command(
-    name="distances",
+    name="spaces",
     help="Compare how distances in the Model and various Input spaces correlate"
 )(model_vs_input_space_cmd)
 

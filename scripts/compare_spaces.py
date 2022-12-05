@@ -1,4 +1,5 @@
 import typer
+import fsspec
 import datamol as dm
 import numpy as np
 import pandas as pd
@@ -90,8 +91,8 @@ def cli(
     base_save_dir: str = DOWNSTREAM_RESULTS_DIR,
     sub_save_dir: Optional[str] = None,
     overwrite: bool = False,
-    representation: Optional[List[str]] = None,
-    dataset: Optional[List[str]] = None,
+    skip_representation: Optional[List[str]] = None,
+    skip_dataset: Optional[List[str]] = None,
     batch_size: int = 16,
 ):
     
@@ -101,11 +102,15 @@ def cli(
     fig_save_dir = dm.fs.join(base_save_dir, "figures", "compare_spaces", sub_save_dir)
     dm.fs.mkdir(fig_save_dir, exist_ok=True)
     logger.info(f"Saving figures to {fig_save_dir}")
-    
-    corr_save_dir = dm.fs.join(base_save_dir, "dataframes", "compare_spaces", sub_save_dir)
-    dm.fs.mkdir(corr_save_dir, exist_ok=True)
-    corr_path = dm.fs.join(corr_save_dir, "correlations.csv")
-    if dm.fs.exists(corr_path) and not overwrite:
+
+    np_save_dir = dm.fs.join(base_save_dir, "numpy", "compare_spaces", sub_save_dir)
+    dm.fs.mkdir(np_save_dir, exist_ok=True)
+    logger.info(f"Saving NumPy arrays to {np_save_dir}")
+
+    df_save_dir = dm.fs.join(base_save_dir, "dataframes", "compare_spaces", sub_save_dir)
+    dm.fs.mkdir(df_save_dir, exist_ok=True)
+    corr_path = dm.fs.join(df_save_dir, "correlations.csv")
+    if dm.fs.exists(df_save_dir) and not overwrite:
         raise typer.BadParameter(f"{corr_path} already exists. Specify --overwrite or --base-save-dir.")
     logger.info(f"Saving correlation dataframe to {corr_path}")
 
@@ -116,7 +121,7 @@ def cli(
     if len(representation) == 0:
         representation = None
 
-    dataset_it = dataset_iterator(progress=True, whitelist=dataset)
+    dataset_it = dataset_iterator(progress=True, blacklist=skip_dataset)
     
     for dataset, (smiles, y) in dataset_it:
         
@@ -124,7 +129,7 @@ def cli(
             smiles, 
             n_jobs=-1, 
             progress=True, 
-            whitelist=representation, 
+            blacklist=skip_representation, 
             standardize_fn=DEFAULT_PREPROCESSING,
             batch_size=batch_size,
         )
@@ -144,8 +149,14 @@ def cli(
 
             # Distances in input spaces
             input_distances = compute_knn_distance(X, [X, optimization, virtual_screening], n_jobs=-1)
-
             labels = ["Train", "Optimization", "Virtual Screening"]
+            
+            for dist, label in zip(input_distances, labels):
+                path = dm.fs.join(np_save_dir, f"{dataset}_{representation}_{label}_input_space.npy")'
+                if dm.fs.exists(df_save_dir) and not overwrite:
+                    raise RuntimeError(f"{path} already exists. Specify --overwrite or --base-save-dir.")
+                with fsspec.open(path, "wb") as fd:
+                    np.save(fd, dist)
             
             ax = plot_distance_distributions(input_distances, labels=labels)
             ax.set_title(f"Input space ({representation}, {dataset})")
@@ -160,6 +171,12 @@ def cli(
                     continue 
 
                 model_distances = get_model_space_distances(model, X, [X, optimization, virtual_screening])
+                for dist, label in zip(model_distances, labels):
+                    path = dm.fs.join(np_save_dir, f"{dataset}_{representation}_{label}_{name}_space.npy")
+                    if dm.fs.exists(df_save_dir) and not overwrite:
+                        raise RuntimeError(f"{path} already exists. Specify --overwrite or --base-save-dir.")
+                    with fsspec.open(path, "wb") as fd:
+                        np.save(fd, dist)
             
                 ax = plot_distance_distributions(model_distances, labels=labels)
                 ax.set_title(f"{name} space ({representation}, {dataset})")

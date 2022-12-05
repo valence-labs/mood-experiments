@@ -194,10 +194,6 @@ class MOODSplitter(BaseShuffleSplit):
         set, in general the lower a model's performance. Using that observation, 
         we prescribe the train-test split that best replicates the distance
         distribution (i.e. "the difficulty") of a downstream application.
-        
-        TODO: A limitation is that you cannot have different groups for different splits
-            You would therefore need a separate splitter class for each of the groupings
-            one is interested in.
         """
         
         if self._downstream_distances is None:
