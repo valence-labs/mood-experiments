@@ -152,7 +152,7 @@ def cli(
             labels = ["Train", "Optimization", "Virtual Screening"]
             
             for dist, label in zip(input_distances, labels):
-                path = dm.fs.join(np_save_dir, f"{dataset}_{representation}_{label}_input_space.npy")'
+                path = dm.fs.join(np_save_dir, f"{dataset}_{representation}_{label}_input_space.npy")
                 if dm.fs.exists(df_save_dir) and not overwrite:
                     raise RuntimeError(f"{path} already exists. Specify --overwrite or --base-save-dir.")
                 with fsspec.open(path, "wb") as fd:
