@@ -54,7 +54,7 @@ def cli(
     calibration_metric = get_calibration_metric(is_regression)
     
     dist_train = []
-    dist_val = []
+    dist_test = []
     y_pred = []
     y_true = []
     y_uncertainty = []
@@ -63,7 +63,8 @@ def cli(
         
         # Randomly split the dataset
         # This ensures that the distribution of distances from val to train is relatively uniform
-        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=seed)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=seed)
+        X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=seed)
         
         file_name = f"best_hparams_{dataset}_{baseline_algorithm}_{representation}_{seed}.yaml"
         out_path = dm.fs.join(out_dir, file_name)
@@ -118,18 +119,18 @@ def cli(
             ensemble_size=10,
         )
         
-        y_pred_ = model.predict(X_val)
-        y_uncertainty_ = predict_uncertainty(model, X_val)
+        y_pred_ = model.predict(X_test)
+        y_uncertainty_ = predict_uncertainty(model, X_test)
         
         y_pred.append(y_pred_)
-        y_true.append(y_val)
+        y_true.append(y_test)
         y_uncertainty.append(y_uncertainty_)
         
-        dist_train_, dist_val_ = compute_knn_distance(X_train, [X_train, X_val])
+        dist_train_, dist_test_ = compute_knn_distance(X_train, [X_train, X_test])
         dist_train.append(dist_train_)
-        dist_val.append(dist_val_)
+        dist_test.append(dist_test_)
     
-    dist_val = np.concatenate(dist_val)
+    dist_test = np.concatenate(dist_test)
     dist_train = np.concatenate(dist_train)
     y_pred = np.concatenate(y_pred)
     y_true = np.concatenate(y_true)
@@ -140,14 +141,14 @@ def cli(
     dist_app = np.concatenate((dist_opt, dist_scr))
     
     lower, upper = np.quantile(dist_train, 0.025), np.quantile(dist_train, 0.975)
-    mask = np.logical_and(dist_val >= lower, dist_val <= upper)
+    mask = np.logical_and(dist_test >= lower, dist_test <= upper)
     score_iid = compute_metric(y_pred[mask], y_true[mask], metric)
     calibration_iid = compute_uncertainty_calibration(y_uncertainty[mask], y_pred[mask], y_true[mask], is_regression)
     logger.info(f"Found an IID {metric} score of {score_iid:.3f}")
     logger.info(f"Found an IID {calibration_metric} calibration score of {calibration_iid:.3f}")
 
     lower, upper = np.quantile(dist_app, 0.025), np.quantile(dist_app, 0.975)
-    mask = np.logical_and(dist_val >= lower, dist_val <= upper)
+    mask = np.logical_and(dist_test >= lower, dist_test <= upper)
     score_ood = compute_metric(y_pred[mask], y_true[mask], metric)
     calibration_ood = compute_uncertainty_calibration(y_uncertainty[mask], y_pred[mask], y_true[mask], is_regression)
     logger.info(f"Found an OOD {metric} score of {score_ood:.3f}")
