@@ -1,20 +1,16 @@
+import enum
 import torch
-
 import datamol as dm
 import numpy as np
+from typing import Callable, Optional
 
-from typing import Optional
+from sklearn.metrics import roc_auc_score
+from torchmetrics.functional import mean_absolute_error, mean_squared_error
+from torchmetrics.functional.classification import binary_auroc, auroc
+from torchmetrics.functional.regression.spearman import _spearman_corrcoef_update, spearman_corrcoef, _rank_data
+from torchmetrics.wrappers.bootstrapping import _bootstrap_sampler
 
-from sklearn.metrics import average_precision_score
-from torch.distributions.utils import clamp_probs
-from torchmetrics.functional.classification import (
-    binary_auroc,
-    binary_average_precision,
-    binary_calibration_error,
-)
-from torchmetrics.functional.regression import mean_absolute_error, spearman_corrcoef
-from torchmetrics.functional.regression.spearman import _rank_data, _spearman_corrcoef_update  # noqa
-from torchmetrics.wrappers.bootstrapping import _bootstrap_sampler  # noqa
+from mood.dataset import MOOD_REGR_DATASETS
 
 
 def weighted_spearman(preds, target, sample_weights=None):
@@ -33,7 +29,8 @@ def weighted_spearman(preds, target, sample_weights=None):
     # 1) Instead of computing the mean, compute the weighted mean
     # 2) Computing the weighted covariance
     # 3) Computing the weighted correlation
-    preds, target = _spearman_corrcoef_update(preds, target)
+    num_outputs = 1 if preds.ndim == 1 else preds.shape[-1]
+    preds, target = _spearman_corrcoef_update(preds, target, num_outputs)
 
     preds = _rank_data(preds)
     target = _rank_data(target)
@@ -50,6 +47,11 @@ def weighted_spearman(preds, target, sample_weights=None):
     return torch.clamp(corrcoef, -1.0, 1.0)
 
 
+def weighted_spearman_calibration(preds, target, uncertainty, sample_weights=None):
+    error = torch.abs(preds - target)
+    return weighted_spearman(error, uncertainty, sample_weights)
+
+
 def weighted_mae(preds, target, sample_weights=None):
     if sample_weights is None:
         return mean_absolute_error(preds=preds, target=target)
@@ -57,82 +59,113 @@ def weighted_mae(preds, target, sample_weights=None):
     return summed_mae / torch.sum(sample_weights)
 
 
-def weighted_auprc(preds, target, sample_weights=None):
+def weighted_brier_score(target, uncertainty, sample_weights=None):
+    confidence = 1.0 - uncertainty
     if sample_weights is None:
-        return binary_average_precision(preds=preds, target=target)
+        return mean_squared_error(confidence, target)
+    summed_mse = torch.square(sample_weights * (confidence - target)).sum()
+    brier_score = summed_mse / torch.sum(sample_weights)
+    return brier_score
+
+
+def weighted_auroc(preds, target, sample_weights=None):
+    if sample_weights is None:
+        return binary_auroc(preds, target)
 
     # TorchMetrics does not actually support sample weights, so we rely on the sklearn implementation
-    # https://github.com/Lightning-AI/metrics/issues/1098
     preds = preds.cpu().numpy()
     target = target.cpu().numpy()
     sample_weights = sample_weights.cpu().numpy()
-
-    return average_precision_score(y_true=target, y_score=preds, sample_weight=sample_weights)
-
-
-METRIC_SYNONYMS = {
-    ("auroc",): binary_auroc,
-    ("auprc", "average_precision"): weighted_auprc,
-    ("mean_absolute_error", "mae"): weighted_mae,
-    ("spearman", "spearman_corrcoef"): weighted_spearman, 
-}
-
-METRIC_TYPES = {
-    ("auroc",): "classification",
-    ("auprc", "average_precision"): "classification",
-    ("mean_absolute_error", "mae"): "regression",
-    ("spearman", "spearman_corrcoef"): "regression",
-    ("ece, expected_calibration_error"): "classification",
-}
-
-METRIC_DIRECTIONS = {
-    ("auroc",): "maximize",
-    ("auprc", "average_precision"): "maximize",
-    ("mean_absolute_error", "mae"): "minimize",
-    ("spearman", "spearman_corrcoef"): "maximize",
-    ("ece, expected_calibration_error"): "minimize",
-}
+    return roc_auc_score(y_true=target, y_score=preds, sample_weight=sample_weights)
 
 
-def get_metric_direction(metric: str):
-    metric_clean = metric.lower().strip().replace(" ", "_")
-    for group, direction in METRIC_DIRECTIONS.items():
-        if metric_clean in group:
-            return direction
-    raise NotImplementedError(f"{metric} is currently not a supported metric")
+class TargetType(enum.Enum):
+    REGRESSION = "regression"
+    BINARY_CLASSIFICATION = "binary_classification"
+
+    def is_regression(self):
+        return self == TargetType.REGRESSION
 
 
-def get_metric_type(metric: str):
-    metric_clean = metric.lower().strip().replace(" ", "_")
-    for group, metric_type in METRIC_TYPES.items():
-        if metric_clean in group:
-            return metric_type
-    raise NotImplementedError(f"{metric} is currently not a supported metric")
+class Metric:
+    def __init__(
+            self,
+            name: str,
+            fn: Callable,
+            mode: str,
+            target_type: TargetType,
+            needs_predictions: bool = True,
+            needs_uncertainty: bool = False,
+    ):
+        self.fn_ = fn
+        self.name = name
+        self.mode = mode
+        self.target_type = target_type
+        self.needs_predictions = needs_predictions
+        self.needs_uncertainty = needs_uncertainty
 
+    @classmethod
+    def get_default_calibration_metric(cls, dataset):
+        is_regression = dataset in MOOD_REGR_DATASETS
+        if is_regression:
+            metric = cls("Spearman", weighted_spearman_calibration, "max", TargetType.REGRESSION, True, True)
+        else:
+            metric = cls("Brier score", weighted_brier_score, "min", TargetType.BINARY_CLASSIFICATION, False, True)
+        return metric
 
-def get_metric(metric: str):
-    metric_clean = metric.lower().strip().replace(" ", "_")
-    for group, function in METRIC_SYNONYMS.items():
-        if metric_clean in group:
-            return function
-    raise NotImplementedError(f"{metric} is currently not a supported metric")
+    @classmethod
+    def get_default_performance_metric(cls, dataset):
+        is_regression = dataset in MOOD_REGR_DATASETS
+        if is_regression:
+            metric = cls("MAE", weighted_mae, "min", TargetType.REGRESSION, True, False)
+        else:
+            metric = cls("AUROC", weighted_auroc, "max", TargetType.BINARY_CLASSIFICATION, True, False)
+        return metric
 
+    def __call__(self, y_true, y_pred: Optional = None, uncertainty: Optional = None, sample_weights: Optional = None):
+        if self.needs_uncertainty and uncertainty is None:
+            raise ValueError("Uncertainty estimates needed, but not provided.")
+        if self.needs_predictions and y_pred is None:
+            raise ValueError("Predictions needed, but not provided.")
+        kwargs = self.to_kwargs(y_true, y_pred, uncertainty, sample_weights)
+        return self.fn_(**kwargs)
 
-def get_calibration_metric(is_regression: bool):
-    return "Spearman" if is_regression else "ECE"
-    
-    
-def is_better(metric: str, before: float, after: float):
-    if get_metric_direction(metric) == "maximize":
-        return before > after
-    else:
-        return after > before
+    def preprocess_targets(self, y_true):
+        if not isinstance(y_true, torch.Tensor):
+            y_true = torch.tensor(y_true)
+        if self.target_type.is_regression():
+            y_true = y_true.float()
+        else:
+            y_true = y_true.int()
+        return y_true
+
+    @staticmethod
+    def preprocess_predictions(y_pred, device):
+        if not isinstance(y_pred, torch.Tensor):
+            y_pred = torch.tensor(y_pred, device=device)
+        y_pred = y_pred.float().squeeze()
+        if y_pred.ndim == 0:
+            y_pred = y_pred.unsqueeze(0)
+        return y_pred
+
+    @staticmethod
+    def preprocess_uncertainties(uncertainty, device):
+        return Metric.preprocess_predictions(uncertainty, device)
+
+    def to_kwargs(self, y_true, y_pred, uncertainty, sample_weights):
+        kwargs = {"target": self.preprocess_targets(y_true), "sample_weights": sample_weights}
+        if self.needs_predictions:
+            kwargs["preds"] = self.preprocess_predictions(y_pred, kwargs["target"].device)
+        if self.needs_uncertainty:
+            kwargs["uncertainty"] = self.preprocess_uncertainties(uncertainty, kwargs["target"].device)
+        return kwargs
 
 
 def compute_bootstrapped_metric(
-    predictions,
     targets,
-    metric,
+    metric: Metric,
+    predictions: Optional = None,
+    uncertainties: Optional = None,
     sample_weights: Optional = None,
     sampling_strategy: str = "poisson",
     n_bootstraps: int = 1000,
@@ -147,78 +180,11 @@ def compute_bootstrapped_metric(
     def fn(it):
         indices = _bootstrap_sampler(len(predictions), sampling_strategy=sampling_strategy)
         _sample_weights = None if sample_weights is None else sample_weights[indices]
-        return compute_metric(predictions[indices], targets[indices], metric, _sample_weights)
+        _uncertainties = None if uncertainties is None else uncertainties[indices]
+        _predictions = None if predictions is None else predictions[indices]
+        score = metric(targets[indices], _predictions, _uncertainties, _sample_weights)
+        return score
 
     bootstrapped_scores = dm.utils.parallelized(fn, range(n_bootstraps), n_jobs=n_jobs)
     bootstrapped_scores = [score for score in bootstrapped_scores if score is not None]
     return np.mean(bootstrapped_scores), np.std(bootstrapped_scores)
-
-
-def compute_metric(predictions, targets, metric, sample_weights: Optional = None):
-    if not isinstance(predictions, torch.Tensor):
-        predictions = torch.tensor(predictions)
-    if not isinstance(targets, torch.Tensor):
-        targets = torch.tensor(targets, device=predictions.device)
-    if sample_weights is not None and not isinstance(sample_weights, torch.Tensor):
-        sample_weights = torch.tensor(sample_weights, device=predictions.device)
-
-    f = get_metric(metric)
-
-    predictions = predictions.float().squeeze()
-    if predictions.ndim == 0:
-        predictions = predictions.unsqueeze(0)
-
-    if get_metric_type(metric) == "classification":
-        targets = targets.int()
-    else:
-        targets = targets.float()
-
-    # These metrics do not make sense when all targets are either 0 or 1
-    if metric.lower() in ["auprc", "auroc"] and (all(targets == 0) or all(targets == 1)):
-        return None
-
-    if sample_weights is not None:
-        return f(preds=predictions, target=targets, sample_weights=sample_weights).item()
-    else:
-        return f(preds=predictions, target=targets).item()
-
-
-def compute_uncertainty_calibration(uncertainties, predictions, targets, is_regression, n_bins: int = 20):
-    """
-    Computes a metric that indicates how well the uncertainty is calibrated.
-    A good calibration means that the uncertainty is likely high if the error is.
-    And the other way around.
-    
-    For regression tasks, we compute the Spearman correlation between absolute error
-    and uncertainty. For classification tasks, we compute the binned difference between
-    the confidence and accuracy within that bin.
-    """
-    if not isinstance(targets, torch.Tensor):
-        targets = torch.tensor(targets)
-    if not isinstance(predictions, torch.Tensor):
-        predictions = torch.tensor(predictions)
-    if not isinstance(uncertainties, torch.Tensor):
-        uncertainties = torch.tensor(uncertainties)
-
-    uncertainties = uncertainties.float().squeeze()
-    if uncertainties.ndim == 0:
-        uncertainties = uncertainties.unsqueeze(0)
-    predictions = predictions.float().squeeze()
-    if predictions.ndim == 0:
-        predictions = predictions.unsqueeze(0)
-
-    if is_regression:
-        targets = targets.float()
-        errors = torch.abs(predictions - targets)
-        spearman = weighted_spearman(errors, uncertainties, sample_weights=None).item()
-        return (spearman + 1.0) / 2.0  # From [-1, 1] to [0, 1]
-    
-    else:
-        if not ((0 <= uncertainties) * (uncertainties <= 1)).all():
-            raise ValueError("All uncertainties should be between 0 and 1")
-
-        confidences = clamp_probs(1.0 - uncertainties).squeeze()
-        if confidences.ndim == 0:
-            confidences = confidences.unsqueeze(0)
-        error = binary_calibration_error(confidences, targets, norm="l1", n_bins=n_bins).item()
-        return 1.0 - error

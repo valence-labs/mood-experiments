@@ -12,8 +12,7 @@ from sklearn.gaussian_process.kernels import PairwiseKernel, Sum, WhiteKernel
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.base import ClassifierMixin, clone
 
-from mood.metrics import compute_metric, get_metric_direction
-
+from mood.metrics import Metric
 
 SUPPORTED_BASELINES = ["MLP", "RF", "GP"]
 
@@ -88,6 +87,7 @@ def predict_uncertainty(model, X):
         uncertainty = np.var(preds, axis=0)
 
     return uncertainty
+
 
 def train_model(
     X, 
@@ -199,9 +199,9 @@ def tune_model(
     X_test, 
     y_train, 
     y_test, 
-    name: str, 
+    name: str,
     is_regression: bool, 
-    metric: str, 
+    metric: Metric,
     global_seed: int,
     for_uncertainty_estimation: bool = False,
     ensemble_size: int = 10,
@@ -223,10 +223,10 @@ def tune_model(
             ensemble_size,
         )
         y_pred = model.predict(X_test)
-        score = compute_metric(y_pred, y_test, metric)
+        score = metric(y_test, y_pred)
         return score
     
-    direction = get_metric_direction(metric)
+    direction = "maximize" if metric.mode == "max" else "minimize"
     sampler = optuna.samplers.TPESampler(seed=global_seed, n_startup_trials=n_startup_trials)
     
     study = optuna.create_study(direction=direction, sampler=sampler)

@@ -1,25 +1,23 @@
 import yaml
-import tqdm
-import fsspec 
+import fsspec
 
 import pandas as pd
 import numpy as np
 import datamol as dm
-import seaborn as sns
-import matplotlib.pyplot as plt
 
 from typing import Optional
 from datetime import datetime
 from loguru import logger
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 from mood.constants import DOWNSTREAM_RESULTS_DIR
-from mood.dataset import load_data_from_tdc, TDC_TO_METRIC, MOOD_REGR_DATASETS
+from mood.dataset import load_data_from_tdc, MOOD_REGR_DATASETS
+from mood.metrics import Metric, compute_bootstrapped_metric
 from mood.representations import featurize
 from mood.baselines import tune_model, train_model, predict_uncertainty
-from mood.utils import bin_with_overlap, load_distances_for_downstream_application, get_outlier_bounds
+from mood.utils import bin_with_overlap, load_distances_for_downstream_application
 from mood.distance import compute_knn_distance
-from mood.metrics import compute_metric, get_metric_direction, compute_uncertainty_calibration, get_calibration_metric
 from mood.preprocessing import DEFAULT_PREPROCESSING
 
 
@@ -34,25 +32,28 @@ def cli(
     sub_save_dir: Optional[str] = None,
     overwrite: bool = False,
 ):
-    
+
     if sub_save_dir is None:
         sub_save_dir = datetime.now().strftime('%Y%m%d')
     out_dir = dm.fs.join(base_save_dir, "dataframes", "compare_performance", sub_save_dir)
     dm.fs.mkdir(out_dir, exist_ok=True)
-    
+
+    # Load the dataset
     smiles, y = load_data_from_tdc(dataset)
     X, mask = featurize(
         smiles, 
         representation, 
-        standardize_fn=DEFAULT_PREPROCESSING[representation]
+        standardize_fn=DEFAULT_PREPROCESSING[representation],
+        disable_logs=True,
     )
     y = y[mask]
-    
-    metric = TDC_TO_METRIC[dataset]
-    direction = get_metric_direction(metric)
     is_regression = dataset in MOOD_REGR_DATASETS
-    calibration_metric = get_calibration_metric(is_regression)
-    
+
+    # Get the metrics
+    perf_metric = Metric.get_default_performance_metric(dataset)
+    cali_metric = Metric.get_default_calibration_metric(dataset)
+
+    # Generate all data needed for these plots
     dist_train = []
     dist_test = []
     y_pred = []
@@ -70,7 +71,6 @@ def cli(
         out_path = dm.fs.join(out_dir, file_name)
         
         if dm.fs.exists(out_path):
-            
             # Load the data of the completed hyper-param study if it already exists
             logger.info(f"Loading the best hyper-params from {out_path}")
             with fsspec.open(out_path) as fd:
@@ -86,7 +86,7 @@ def cli(
                 y_test=y_val, 
                 name=baseline_algorithm, 
                 is_regression=is_regression, 
-                metric=metric, 
+                metric=perf_metric,
                 global_seed=seed,
                 n_trials=n_trials,
                 n_startup_trials=n_startup_trials,
@@ -104,8 +104,7 @@ def cli(
             out_path = dm.fs.join(out_dir, file_name)
             
             logger.info(f"Saving the trials dataframe to {out_path}")
-            study.trials_dataframe().to_csv(out_path)            
-        
+            study.trials_dataframe().to_csv(out_path)
         
         random_state = params.pop("random_state")
         model = train_model(
@@ -135,24 +134,26 @@ def cli(
     y_pred = np.concatenate(y_pred)
     y_true = np.concatenate(y_true)
     y_uncertainty = np.concatenate(y_uncertainty)
-    
+
+    # Collect the distances of the downstream applications
     dist_scr = load_distances_for_downstream_application("virtual_screening", representation, dataset)
     dist_opt = load_distances_for_downstream_application("optimization", representation, dataset)
     dist_app = np.concatenate((dist_opt, dist_scr))
-    
+
+    # Compute the difference in IID and OOD performance and calibration
     lower, upper = np.quantile(dist_train, 0.025), np.quantile(dist_train, 0.975)
     mask = np.logical_and(dist_test >= lower, dist_test <= upper)
-    score_iid = compute_metric(y_pred[mask], y_true[mask], metric)
-    calibration_iid = compute_uncertainty_calibration(y_uncertainty[mask], y_pred[mask], y_true[mask], is_regression)
-    logger.info(f"Found an IID {metric} score of {score_iid:.3f}")
-    logger.info(f"Found an IID {calibration_metric} calibration score of {calibration_iid:.3f}")
+    score_iid = perf_metric(y_true[mask], y_pred[mask])
+    calibration_iid = cali_metric(y_true[mask], y_pred[mask], y_uncertainty[mask])
+    logger.info(f"Found an IID {perf_metric.name} score of {score_iid:.3f}")
+    logger.info(f"Found an IID {cali_metric.name} calibration score of {calibration_iid:.3f}")
 
     lower, upper = np.quantile(dist_app, 0.025), np.quantile(dist_app, 0.975)
     mask = np.logical_and(dist_test >= lower, dist_test <= upper)
-    score_ood = compute_metric(y_pred[mask], y_true[mask], metric)
-    calibration_ood = compute_uncertainty_calibration(y_uncertainty[mask], y_pred[mask], y_true[mask], is_regression)
-    logger.info(f"Found an OOD {metric} score of {score_ood:.3f}")
-    logger.info(f"Found an OOD {calibration_metric} calibration score of {calibration_ood:.3f}")
+    score_ood = perf_metric(y_true[mask], y_pred[mask])
+    calibration_ood = cali_metric(y_true[mask], y_pred[mask], y_uncertainty[mask])
+    logger.info(f"Found an OOD {perf_metric.name} score of {score_ood:.3f}")
+    logger.info(f"Found an OOD {cali_metric.name} calibration score of {calibration_ood:.3f}")
     
     file_name = f"gap_{dataset}_{baseline_algorithm}_{representation}.csv"
     out_path = dm.fs.join(out_dir, file_name)
@@ -160,7 +161,7 @@ def cli(
         raise RuntimeError(f"{out_path} already exists!")
     
     # Saving this as a CSV might be a bit wasteful, 
-    # but I am not sure what makes more sense
+    # but it's convenient
     logger.info(f"Saving the IID/OOD gap data to {out_path}")
         
     pd.DataFrame({
@@ -169,6 +170,48 @@ def cli(
         "representation": representation,
         "iid_score": [score_iid, calibration_iid],
         "ood_score": [score_ood, calibration_ood],
-        "metric": [metric, calibration_metric],
+        "metric": [perf_metric.name, cali_metric.name],
         "type": ["performance", "calibration"]
     }).to_csv(out_path, index=False)
+
+    # Compute the performance over distance
+    df = pd.DataFrame()
+    for distance, mask in tqdm(bin_with_overlap(dist_test)):
+        target = y_true[mask]
+        preds = y_pred[mask]
+        uncertainty = y_uncertainty[mask]
+
+        n_samples = mask.sum()
+        if len(target) < n_samples:
+            continue
+
+        perf_mu, perf_std = compute_bootstrapped_metric(
+            targets=target, predictions=preds, metric=perf_metric, n_jobs=-1
+        )
+
+        cali_mu, cali_std = compute_bootstrapped_metric(
+            targets=target, predictions=preds, uncertainties=uncertainty, metric=cali_metric, n_jobs=-1
+        )
+
+        df_ = pd.DataFrame({
+            "dataset": dataset,
+            "algorithm": baseline_algorithm,
+            "representation": representation,
+            "distance": distance,
+            "score_mu": [perf_mu, cali_mu],
+            "score_std": [perf_std, cali_std],
+            "type":  ["performance", "calibration"],
+            "metric": [perf_metric.name, cali_metric.name],
+            "n_samples": n_samples,
+        })
+        df = pd.concat((df, df_), ignore_index=True)
+
+    file_name = f"perf_over_distance_{dataset}_{baseline_algorithm}_{representation}.csv"
+    out_path = dm.fs.join(out_dir, file_name)
+    if dm.fs.exists(out_path) and not overwrite:
+        raise RuntimeError(f"{out_path} already exists!")
+
+    # Saving this as a CSV might be a bit wasteful,
+    # but it's convenient
+    logger.info(f"Saving the performance over distance data to {out_path}")
+    df.to_csv(out_path, index=False)

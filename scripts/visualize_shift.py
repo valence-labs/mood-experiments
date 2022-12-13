@@ -10,7 +10,7 @@ from mood.visualize import plot_distance_distributions
 from mood.distance import compute_knn_distance
 from mood.utils import load_representation_for_downstream_application
 from mood.baselines import train_model
-from mood.transformer import ModelSpaceTransformer
+from mood.model_space import ModelSpaceTransformer
 
 
 def cli(

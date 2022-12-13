@@ -6,6 +6,7 @@ from scripts.precompute_representations import cli as precompute_representation_
 from scripts.precompute_distances import cli as precompute_distances_cmd
 from scripts.visualize_shift import cli as visualize_shift_cmd
 from scripts.visualize_splits import cli as visualize_splits_cmd
+from scripts.visualize_perf_over_distance import cli as perf_over_distance_cmd
 
 
 compare_app = typer.Typer(help="Various CLIs that involve comparing two things")
@@ -50,6 +51,11 @@ visualize_app.command(
     name="splits",
     help="Visualize how representative different splits are of downstream applications"
 )(visualize_splits_cmd)
+
+visualize_app.command(
+    name="performance_over_distance",
+    help="Visualize how performance and calibration evolve over distance"
+)(perf_over_distance_cmd)
 
                           
 app = typer.Typer(help="CLI for the various stand-alone scripts of MOOD")

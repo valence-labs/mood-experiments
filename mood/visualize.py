@@ -1,11 +1,74 @@
 import fsspec
-import tqdm
 import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
 import numpy as np
 from PIL import Image
 from typing import Optional, List, Dict
 from mood.utils import get_outlier_bounds
+from mood.metrics import Metric
+
+
+def plot_performance_over_distance(
+    performance_data: pd.DataFrame,
+    calibration_data: pd.DataFrame,
+    dataset_name: str,
+    ax: Optional = None,
+    show_legend: bool = True,
+):
+
+    show_legend = True
+    if ax is None:
+        _, ax = plt.subplots(figsize=(12, 6))
+
+    expected_columns = ["distance", "score_lower", "score_mu", "score_upper"]
+    if not all(c in performance_data.columns for c in expected_columns):
+        raise ValueError(f"For performance_data, expecting {expected_columns}, found {performance_data.columns}")
+    if not all(c in calibration_data.columns for c in expected_columns):
+        raise ValueError(f"For calibration_data, expecting {expected_columns}, found {calibration_data.columns}")
+
+    def _plot(data, color, ax):
+        sns.lineplot(x=data[:, 0], y=data[:, 2], color=color, ax=ax, lw=4)
+        ax.fill_between(data[:, 0], data[:, 1], data[:, 3], color=color, alpha=0.2)
+        return ax
+
+    ax = _plot(performance_data[expected_columns].to_numpy(), "tab:blue", ax)
+    ax_calibration = _plot(calibration_data[expected_columns].to_numpy(), "tab:orange", ax.twinx())
+
+    perf_metric = Metric.get_default_performance_metric(dataset_name)
+    cali_metric = Metric.get_default_calibration_metric(dataset_name)
+
+    if perf_metric.mode == "min":
+        ax.invert_yaxis()
+    if cali_metric.mode == "min":
+        ax_calibration.invert_yaxis()
+
+    label = f"Calibration ({cali_metric.name})"
+    ax_calibration.set_ylabel(label, rotation=-90, labelpad=18, fontsize=12)
+
+    label = f"Performance ({perf_metric.name})"
+    ax.set_ylabel(label, fontsize=12)
+    ax.set_xlabel("Distance")
+    ax.set_title(dataset_name, fontsize=18)
+
+    if show_legend:
+
+        legend_lines = [
+            plt.Line2D([0], [0], color="tab:blue", lw=4),
+            plt.Line2D([0], [0], color="tab:orange", lw=4),
+        ]
+        labels = ["Performance", "Calibration"]
+
+        ax.legend(
+            legend_lines,
+            labels,
+            fontsize=12,
+            loc="lower center",
+            ncol=len(labels),
+            fancybox=True
+        )
+
+    return ax, ax_calibration
 
 
 def plot_distance_distributions(
