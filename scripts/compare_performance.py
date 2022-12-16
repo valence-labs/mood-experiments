@@ -181,8 +181,8 @@ def cli(
         preds = y_pred[mask]
         uncertainty = y_uncertainty[mask]
 
-        n_samples = mask.sum()
-        if len(target) < n_samples:
+        n_samples = len(mask)
+        if n_samples < 25:
             continue
 
         perf_mu, perf_std = compute_bootstrapped_metric(
@@ -211,7 +211,5 @@ def cli(
     if dm.fs.exists(out_path) and not overwrite:
         raise RuntimeError(f"{out_path} already exists!")
 
-    # Saving this as a CSV might be a bit wasteful,
-    # but it's convenient
     logger.info(f"Saving the performance over distance data to {out_path}")
     df.to_csv(out_path, index=False)

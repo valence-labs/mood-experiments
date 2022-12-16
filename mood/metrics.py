@@ -108,27 +108,38 @@ class Metric:
     def get_default_calibration_metric(cls, dataset):
         is_regression = dataset in MOOD_REGR_DATASETS
         if is_regression:
-            metric = cls("Spearman", weighted_spearman_calibration, "max", TargetType.REGRESSION, True, True)
+            metric = cls.by_name("Spearman")
         else:
-            metric = cls("Brier score", weighted_brier_score, "min", TargetType.BINARY_CLASSIFICATION, False, True)
+            metric = cls.by_name("Brier score")
         return metric
 
     @classmethod
     def get_default_performance_metric(cls, dataset):
         is_regression = dataset in MOOD_REGR_DATASETS
         if is_regression:
-            metric = cls("MAE", weighted_mae, "min", TargetType.REGRESSION, True, False)
+            metric = cls.by_name("MAE")
         else:
-            metric = cls("AUROC", weighted_auroc, "max", TargetType.BINARY_CLASSIFICATION, True, False)
+            metric = cls.by_name("AUROC")
         return metric
 
+    @classmethod
+    def by_name(cls, name):
+        if name == "MAE":
+            return cls("MAE", weighted_mae, "min", TargetType.REGRESSION, True, False)
+        elif name == "Spearman":
+            return cls("Spearman", weighted_spearman_calibration, "max", TargetType.REGRESSION, True, True)
+        elif name == "AUROC":
+            return cls("AUROC", weighted_auroc, "max", TargetType.BINARY_CLASSIFICATION, True, False)
+        elif name == "Brier score":
+            return cls("Brier score", weighted_brier_score, "min", TargetType.BINARY_CLASSIFICATION, False, True)
+    
     def __call__(self, y_true, y_pred: Optional = None, uncertainty: Optional = None, sample_weights: Optional = None):
         if self.needs_uncertainty and uncertainty is None:
             raise ValueError("Uncertainty estimates needed, but not provided.")
         if self.needs_predictions and y_pred is None:
             raise ValueError("Predictions needed, but not provided.")
         kwargs = self.to_kwargs(y_true, y_pred, uncertainty, sample_weights)
-        return self.fn_(**kwargs)
+        return self.fn_(**kwargs).item()
 
     def preprocess_targets(self, y_true):
         if not isinstance(y_true, torch.Tensor):

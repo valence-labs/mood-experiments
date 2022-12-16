@@ -118,24 +118,15 @@ def plot_distance_distributions(
     return ax
 
 
-def visualize_images_in_grid(
-    data: Dict[str, Dict[str, str]],
-    row_labels: Optional[List[str]] = None,
-    col_labels: Optional[List[str]] = None,
+def axes_grid_iterator(
+    col_labels: List[str], 
+    row_labels: List[str],
     col_size: int = 6, 
-    row_size: int = 3,
-    tight: bool = True, 
+    row_size: int = 3
 ):
-    if row_labels is None: 
-        row_labels = list(data.keys())
-    if col_labels is None:
-        col_labels = set()
-        for r in row_labels: 
-            col_labels.update(data[r].keys())
-        col_labels = list(col_labels)
     
-    nrows = len(row_labels)
     ncols = len(col_labels)
+    nrows = len(row_labels)
     
     fig, axs = plt.subplots(ncols=ncols, nrows=nrows, figsize=(col_size * ncols, row_size * nrows))
     axs = np.atleast_2d(axs)
@@ -143,13 +134,9 @@ def visualize_images_in_grid(
     for ri, row in enumerate(row_labels): 
         for ci, col in enumerate(col_labels):
             ax = axs[ri][ci]
-            ax.axis("off")
-            
-            im_path = data[row][col]
-            with fsspec.open(im_path) as fd:
-                im = Image.open(fd)
-                ax.imshow(im, aspect="auto")
-    
-    if tight:
-        plt.tight_layout()
-    return fig, axs
+            if ci == 0:
+                ax.set_ylabel(row)
+            if ri == 0:
+                ax.set_title(col)
+            yield ax, row, col
+
