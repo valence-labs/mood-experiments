@@ -101,6 +101,10 @@ def cli(
             progress=verbose,
         )
         
+        # Setting max length. We don't ignore padding tokens, so best to do this per dataset
+        graphormer.set_max_length(graphormer.compute_max_length(df["smiles"].values))
+        logger.info(f"Computed a max number of nodes of {graphormer.max_length}")
+        
         df["unique_id"] = dm.utils.parallelized(
             dm.unique_id,
             df["smiles"].values,
