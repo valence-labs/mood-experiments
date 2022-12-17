@@ -7,6 +7,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+from loguru import logger
+
 from mood.constants import DOWNSTREAM_APPS_DATA_DIR, CACHE_DIR
 
 
@@ -18,9 +20,12 @@ def load_representation_for_downstream_application(
     
     lpath = dm.fs.join(CACHE_DIR, "downstream_applications", *suffix)
     if not dm.fs.exists(lpath) or update_cache:
+        logger.debug(f"Downloading {rpath} to {lpath}")
         rpath = dm.fs.join(DOWNSTREAM_APPS_DATA_DIR, *suffix)
         dm.fs.copy_file(rpath, lpath)
-    
+    else: 
+        logger.debug(f"Using cache at {lpath}")
+        
     data = pd.read_parquet(lpath)
     
     X = np.stack(data["representation"].values)
@@ -30,7 +35,7 @@ def load_representation_for_downstream_application(
     if not return_compound_ids:
         return X[mask]
     
-    indices = data[mask]["unique_id"].to_numpy()
+    indices = data.iloc[mask]["unique_id"].to_numpy()
     return X[mask], indices
 
 
@@ -42,9 +47,12 @@ def load_distances_for_downstream_application(
     
     lpath = dm.fs.join(CACHE_DIR, "downstream_applications", *suffix)
     if not dm.fs.exists(lpath) or update_cache:
+        logger.debug(f"Downloading {rpath} to {lpath}")
         rpath = dm.fs.join(DOWNSTREAM_APPS_DATA_DIR, *suffix)
         dm.fs.copy_file(rpath, lpath)
-    
+    else: 
+        logger.debug(f"Using cache at {lpath}")
+        
     data = pd.read_parquet(lpath)
     
     distances = data["distance"].to_numpy()
@@ -53,7 +61,7 @@ def load_distances_for_downstream_application(
     if not return_compound_ids:
         return distances[mask]
     
-    indices = data[mask]["unique_id"].to_numpy()
+    indices = data.iloc[mask]["unique_id"].to_numpy()
     return distances[mask], indices
 
 

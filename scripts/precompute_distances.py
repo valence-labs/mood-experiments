@@ -60,10 +60,10 @@ def cli(
             y_repr = y[mask]
 
             virtual_screening, vs_compounds = load_representation_for_downstream_application(
-                "virtual_screening", representation, return_compound_ids=True
+                "virtual_screening", representation, return_compound_ids=True, update_cache=True,
             )
             optimization, opt_compounds = load_representation_for_downstream_application(
-                "optimization", representation, return_compound_ids=True
+                "optimization", representation, return_compound_ids=True, update_cache=True,
             )
 
             input_distances = compute_knn_distance(X, [optimization, virtual_screening], n_jobs=-1)

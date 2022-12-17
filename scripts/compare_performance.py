@@ -136,8 +136,8 @@ def cli(
     y_uncertainty = np.concatenate(y_uncertainty)
 
     # Collect the distances of the downstream applications
-    dist_scr = load_distances_for_downstream_application("virtual_screening", representation, dataset)
-    dist_opt = load_distances_for_downstream_application("optimization", representation, dataset)
+    dist_scr = load_distances_for_downstream_application("virtual_screening", representation, dataset, update_cache=True)
+    dist_opt = load_distances_for_downstream_application("optimization", representation, dataset, update_cache=True)
     dist_app = np.concatenate((dist_opt, dist_scr))
 
     # Compute the difference in IID and OOD performance and calibration

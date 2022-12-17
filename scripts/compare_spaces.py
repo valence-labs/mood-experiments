@@ -133,8 +133,8 @@ def cli(
 
             y_repr = y[mask]
 
-            virtual_screening = load_representation_for_downstream_application("virtual_screening", representation)
-            optimization = load_representation_for_downstream_application("optimization", representation)      
+            virtual_screening = load_representation_for_downstream_application("virtual_screening", representation, update_cache=True)
+            optimization = load_representation_for_downstream_application("optimization", representation, update_cache=True)      
 
             is_regression = dataset in MOOD_REGR_DATASETS
             mlp_model = train_model(X, y_repr, "MLP", is_regression)

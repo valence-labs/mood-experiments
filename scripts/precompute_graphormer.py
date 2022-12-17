@@ -50,7 +50,7 @@ def cli(
         )
 
         if dm.fs.exists(out_path) and not overwrite:
-            raise ValueError(f"{out_path} already exists! Use --override to override!")
+            raise ValueError(f"{out_path} already exists! Use --overwrite to overwrite!")
     
         # Load
         logger.info(f"Loading SMILES from {in_path}")
@@ -91,7 +91,7 @@ def cli(
         )
         
         if dm.fs.exists(out_path) and not overwrite:
-            raise ValueError(f"{out_path} already exists! Use --override to override!")
+            raise ValueError(f"{out_path} already exists! Use --overwrite to overwrite!")
         
         df = pd.DataFrame()
         df["smiles"] = dm.utils.parallelized(

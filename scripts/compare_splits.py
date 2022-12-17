@@ -25,7 +25,7 @@ def cli(
     save_figures: bool = True,
     n_splits: int = 5,
     seed: Optional[int] = None,
-    use_cache: bool = True,
+    use_cache: bool = False,
     batch_size: int = 16,
     verbose: bool = False,
     overwrite: bool = False,
