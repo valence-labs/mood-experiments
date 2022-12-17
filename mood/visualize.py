@@ -15,9 +15,11 @@ def plot_performance_over_distance(
     dataset_name: str,
     ax: Optional = None,
     show_legend: bool = True,
+    show_title: bool = True, 
+    show_xlabel: bool = True,
+    show_ylabel: bool = True, 
 ):
 
-    show_legend = True
     if ax is None:
         _, ax = plt.subplots(figsize=(12, 6))
 
@@ -42,17 +44,21 @@ def plot_performance_over_distance(
         ax.invert_yaxis()
     if cali_metric.mode == "min":
         ax_calibration.invert_yaxis()
+    
+    if show_ylabel:
+        label = f"Calibration ({cali_metric.name})"
+        ax_calibration.set_ylabel(label, rotation=-90, labelpad=18, fontsize=12)
 
-    label = f"Calibration ({cali_metric.name})"
-    ax_calibration.set_ylabel(label, rotation=-90, labelpad=18, fontsize=12)
-
-    label = f"Performance ({perf_metric.name})"
-    ax.set_ylabel(label, fontsize=12)
-    ax.set_xlabel("Distance")
-    ax.set_title(dataset_name, fontsize=18)
+        label = f"Performance ({perf_metric.name})"
+        ax.set_ylabel(label, fontsize=12)
+        
+    if show_xlabel: 
+        ax.set_xlabel("Distance")
+    
+    if show_title: 
+        ax.set_title(dataset_name, fontsize=18)
 
     if show_legend:
-
         legend_lines = [
             plt.Line2D([0], [0], color="tab:blue", lw=4),
             plt.Line2D([0], [0], color="tab:orange", lw=4),
@@ -121,8 +127,10 @@ def plot_distance_distributions(
 def axes_grid_iterator(
     col_labels: List[str], 
     row_labels: List[str],
-    col_size: int = 6, 
-    row_size: int = 3
+    col_size: int = 5, 
+    row_size: int = 5,
+    fontsize: int = 24,
+    margin: float = 0.25,
 ):
     
     ncols = len(col_labels)
@@ -135,8 +143,25 @@ def axes_grid_iterator(
         for ci, col in enumerate(col_labels):
             ax = axs[ri][ci]
             if ci == 0:
-                ax.set_ylabel(row)
+                ax.text(
+                    -margin, 
+                    0.5, 
+                    row, 
+                    rotation="vertical", 
+                    va="center", 
+                    ha="center", 
+                    transform=ax.transAxes, 
+                    fontsize=fontsize
+                )
             if ri == 0:
-                ax.set_title(col)
-            yield ax, row, col
+                ax.text(
+                    0.5, 
+                    1 + margin, 
+                    col, 
+                    transform=ax.transAxes, 
+                    va="center", 
+                    ha="center", 
+                    fontsize=fontsize
+                )
+            yield ax, ri, ci
 

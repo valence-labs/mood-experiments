@@ -83,7 +83,7 @@ def featurize(
 ):
     if name not in _REPR_TO_FUNC:
         msg = f"{name} is not supported. Choose from {MOOD_REPRESENTATIONS}"
-        raise NotImplementedError(name)
+        raise NotImplementedError(msg)
     
     fn = partial(standardize_fn, disable_logs=disable_logs) 
     smiles = np.array(

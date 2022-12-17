@@ -9,7 +9,6 @@ from loguru import logger
 from functools import partial
 from typing import Optional, List
 from mood.preprocessing import DEFAULT_PREPROCESSING
-from mood.representations import MOOD_REPRESENTATIONS, featurize, TEXTUAL_FEATURIZERS
 from mood.constants import DOWNSTREAM_APPS_DATA_DIR, DATASET_DATA_DIR, SUPPORTED_DOWNSTREAM_APPS
 from mood.dataset import dataset_iterator, MOOD_DATASETS
 
@@ -29,7 +28,7 @@ STATE_DICT = {
 def cli(
     batch_size: int = 16,
     verbose: bool = False, 
-    override: bool = False,
+    overwrite: bool = False,
     skip: Optional[List[str]] = None,
 ): 
     
@@ -50,7 +49,7 @@ def cli(
             f"Graphormer.parquet"
         )
 
-        if dm.fs.exists(out_path) and not override: 
+        if dm.fs.exists(out_path) and not overwrite:
             raise ValueError(f"{out_path} already exists! Use --override to override!")
     
         # Load
@@ -64,7 +63,11 @@ def cli(
             n_jobs=-1,
             progress=verbose,
         )
-    
+
+        # Setting max length. We don't ignore padding tokens, so best to do this per dataset
+        graphormer.set_max_length(graphormer.compute_max_length(df["smiles"].values))
+        logger.info(f"Computed a max number of nodes of {graphormer.max_length}")
+
         # Compute the representation
         logger.info(f"Precomputing Graphormer representation")
         feats = graphormer.batch_transform(graphormer, df["smiles"].values, batch_size=batch_size, n_jobs=None)
@@ -75,8 +78,7 @@ def cli(
         # Save
         logger.info(f"Saving results to {out_path}")
         df[["unique_id", "representation"]].to_parquet(out_path)
-        
-    
+
     blacklist = [app for app in MOOD_DATASETS if app in skip]
     for dataset, (smiles, _) in dataset_iterator(progress=verbose, blacklist=blacklist, disable_logs=True):
         
@@ -88,7 +90,7 @@ def cli(
             f"Graphormer.parquet"
         )
         
-        if dm.fs.exists(out_path) and not override: 
+        if dm.fs.exists(out_path) and not overwrite:
             raise ValueError(f"{out_path} already exists! Use --override to override!")
         
         df = pd.DataFrame()

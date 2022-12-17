@@ -182,7 +182,7 @@ def cli(
         uncertainty = y_uncertainty[mask]
 
         n_samples = len(mask)
-        if n_samples < 25:
+        if n_samples < 25 or len(np.unique(target)) == 1:
             continue
 
         perf_mu, perf_std = compute_bootstrapped_metric(

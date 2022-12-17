@@ -69,7 +69,7 @@ def dataset_iterator(
 
 TDC_TO_MOOD = {
     "BBB_Martins": "BBB",
-    "CYP2C9_Veith": "CYPP4502C9",
+    "CYP2C9_Veith": "CYP2C9",
     "Caco2_Wang": "Caco-2",
     "Clearance_Hepatocyte_AZ": "Clearance", 
     "DILI": "DILI",
@@ -93,9 +93,9 @@ MOOD_DATASETS = [
    'PPBR',
    'BBB',
    'Lipophilicity',
-   'CYPP4502C9'
+   'CYP2C9'
 ]
 
 MOOD_TO_TDC = {v: k for k, v in TDC_TO_MOOD.items()}
-MOOD_CLSF_DATASETS = ["BBB", "CYPP4502C9", "DILI", "HIA", "Pgp", "hERG"]
+MOOD_CLSF_DATASETS = ["BBB", "CYP2C9", "DILI", "HIA", "Pgp", "hERG"]
 MOOD_REGR_DATASETS = [d for d in MOOD_DATASETS if d not in MOOD_CLSF_DATASETS]
