@@ -22,7 +22,7 @@ def load_representation_for_downstream_application(
     if not dm.fs.exists(lpath) or update_cache:
         rpath = dm.fs.join(DOWNSTREAM_APPS_DATA_DIR, *suffix)
         logger.debug(f"Downloading {rpath} to {lpath}")
-        dm.fs.copy_file(rpath, lpath)
+        dm.fs.copy_file(rpath, lpath, force=update_cache)
     else: 
         logger.debug(f"Using cache at {lpath}")
         
@@ -49,7 +49,7 @@ def load_distances_for_downstream_application(
     if not dm.fs.exists(lpath) or update_cache:
         rpath = dm.fs.join(DOWNSTREAM_APPS_DATA_DIR, *suffix)
         logger.debug(f"Downloading {rpath} to {lpath}")
-        dm.fs.copy_file(rpath, lpath)
+        dm.fs.copy_file(rpath, lpath, force=update_cache)
     else: 
         logger.debug(f"Using cache at {lpath}")
         
