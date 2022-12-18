@@ -24,4 +24,4 @@ setup(
             "mood=mood.__main__:app",
         ],
     },
-) 
+)

@@ -12,52 +12,45 @@ from scripts.visualize_perf_over_distance import cli as perf_over_distance_cmd
 compare_app = typer.Typer(help="Various CLIs that involve comparing two things")
 
 compare_app.command(
-    name="spaces",
-    help="Compare how distances in the Model and various Input spaces correlate"
+    name="spaces", help="Compare how distances in the Model and various Input spaces correlate"
 )(model_vs_input_space_cmd)
 
 compare_app.command(
-    name="performance",
-    help="Compare how the model performs on compounds in the IID and OOD range"
+    name="performance", help="Compare how the model performs on compounds in the IID and OOD range"
 )(iid_ood_gap_cmd)
 
 compare_app.command(
     name="splits",
-    help="Compare how different splits replicate the shift between train and downstream applications"
+    help="Compare how different splits replicate the shift between train and downstream applications",
 )(compare_splits_cmd)
 
 
 precompute_app = typer.Typer(help="Various CLIs that precompute data used later on")
 
 precompute_app.command(
-    name="representation",
-    help="Precompute representations and save these as .parquet files"
+    name="representation", help="Precompute representations and save these as .parquet files"
 )(precompute_representation_cmd)
 
 precompute_app.command(
-    name="distances",
-    help="Precompute distances from downstream applications to the different train sets"
+    name="distances", help="Precompute distances from downstream applications to the different train sets"
 )(precompute_distances_cmd)
 
 
 visualize_app = typer.Typer(help="Various CLIs to visualize results")
 
-visualize_app.command(
-    name="shift",
-    help="Visualize the shift from train to downstream applications"
-)(visualize_shift_cmd)
+visualize_app.command(name="shift", help="Visualize the shift from train to downstream applications")(
+    visualize_shift_cmd
+)
 
 visualize_app.command(
-    name="splits",
-    help="Visualize how representative different splits are of downstream applications"
+    name="splits", help="Visualize how representative different splits are of downstream applications"
 )(visualize_splits_cmd)
 
 visualize_app.command(
-    name="performance_over_distance",
-    help="Visualize how performance and calibration evolve over distance"
+    name="performance_over_distance", help="Visualize how performance and calibration evolve over distance"
 )(perf_over_distance_cmd)
 
-                          
+
 app = typer.Typer(help="CLI for the various stand-alone scripts of MOOD")
 app.add_typer(compare_app, name="compare")
 app.add_typer(precompute_app, name="precompute")

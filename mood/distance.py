@@ -7,14 +7,14 @@ from sklearn.neighbors import NearestNeighbors
 
 def get_metric(example):
     """Get the appropiate distance metric given an exemplary datapoint"""
-    
+
     # By default we use the Euclidean distance
     metric = "euclidean"
-    
+
     # For binary vectors we use jaccard
     if ((example == 0) | (example == 1)).all():
         metric = "jaccard"
-        
+
     return metric
 
 
@@ -29,7 +29,7 @@ def compute_knn_distance(
     """
     Computes the mean k-Nearest Neighbors distance
     between a set of database embeddings and a set of query embeddings
-    
+
     Args:
         X: The set of samples that form kNN candidates
         Y: The samples for which to find the kNN for. If None, will find kNN for `database`
@@ -38,38 +38,38 @@ def compute_knn_distance(
         n_jobs: Controls the parallelization
         return_indices: Whether to return the indices of the NNs as well
     """
-    
-    if metric is None: 
+
+    if metric is None:
         metric = get_metric(X[0])
-        
+
     knn = NearestNeighbors(n_neighbors=k, metric=metric)
     knn.fit(X)
 
     if Y is None:
         # if Y is not specified, we compute the distance of X to itself
         Y = X
-        
+
     else:
         if not isinstance(Y, list):
             Y = [Y]
-        
+
         distances, indices = [], []
         for queries in Y:
-            
+
             if np.array_equal(X, queries):
-                # Use k + 1 and filter out the first 
+                # Use k + 1 and filter out the first
                 # because the sample will always be its own neighbor
                 dist, ind = knn.kneighbors(queries, n_neighbors=k + 1)
                 dist, ind = dist[:, 1:], ind[:, 1:]
             else:
                 dist, ind = knn.kneighbors(queries, n_neighbors=k)
-                
+
             distances.append(dist)
             indices.append(ind)
 
     # The distance from the query molecule to its NNs is the mean of all pairwise distances
     distances = [np.mean(dist, axis=1) for dist in distances]
-    
+
     if len(distances) == 1:
         assert len(indices) == 1
         distances = distances[0]

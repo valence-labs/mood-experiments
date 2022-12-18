@@ -19,14 +19,14 @@ class EmpiricalKernelMapTransformer:
         self._random_state = random_state
         self._samples = None
         self._metric = metric
-    
+
     def __call__(self, X):
         """Transforms a list of datapoints"""
         return self.transform(X)
-    
+
     def transform(self, X):
         """Transforms a single datapoint"""
-        if self._samples is None: 
+        if self._samples is None:
             rng = np.random.default_rng(self._random_state)
             self._samples = X[rng.choice(np.arange(len(X)), self._n_samples)]
         X = cdist(X, self._samples, metric=self._metric)

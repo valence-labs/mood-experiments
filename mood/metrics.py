@@ -7,7 +7,11 @@ from typing import Callable, Optional
 from sklearn.metrics import roc_auc_score
 from torchmetrics.functional import mean_absolute_error, mean_squared_error
 from torchmetrics.functional.classification import binary_auroc, auroc
-from torchmetrics.functional.regression.spearman import _spearman_corrcoef_update, spearman_corrcoef, _rank_data
+from torchmetrics.functional.regression.spearman import (
+    _spearman_corrcoef_update,
+    spearman_corrcoef,
+    _rank_data,
+)
 from torchmetrics.wrappers.bootstrapping import _bootstrap_sampler
 
 from mood.dataset import MOOD_REGR_DATASETS
@@ -89,13 +93,13 @@ class TargetType(enum.Enum):
 
 class Metric:
     def __init__(
-            self,
-            name: str,
-            fn: Callable,
-            mode: str,
-            target_type: TargetType,
-            needs_predictions: bool = True,
-            needs_uncertainty: bool = False,
+        self,
+        name: str,
+        fn: Callable,
+        mode: str,
+        target_type: TargetType,
+        needs_predictions: bool = True,
+        needs_uncertainty: bool = False,
     ):
         self.fn_ = fn
         self.name = name
@@ -131,9 +135,13 @@ class Metric:
         elif name == "AUROC":
             return cls("AUROC", weighted_auroc, "max", TargetType.BINARY_CLASSIFICATION, True, False)
         elif name == "Brier score":
-            return cls("Brier score", weighted_brier_score, "min", TargetType.BINARY_CLASSIFICATION, False, True)
-    
-    def __call__(self, y_true, y_pred: Optional = None, uncertainty: Optional = None, sample_weights: Optional = None):
+            return cls(
+                "Brier score", weighted_brier_score, "min", TargetType.BINARY_CLASSIFICATION, False, True
+            )
+
+    def __call__(
+        self, y_true, y_pred: Optional = None, uncertainty: Optional = None, sample_weights: Optional = None
+    ):
         if self.needs_uncertainty and uncertainty is None:
             raise ValueError("Uncertainty estimates needed, but not provided.")
         if self.needs_predictions and y_pred is None:

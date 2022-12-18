@@ -34,15 +34,15 @@ def cli(
 ):
 
     if sub_save_dir is None:
-        sub_save_dir = datetime.now().strftime('%Y%m%d')
+        sub_save_dir = datetime.now().strftime("%Y%m%d")
     out_dir = dm.fs.join(base_save_dir, "dataframes", "compare_performance", sub_save_dir)
     dm.fs.mkdir(out_dir, exist_ok=True)
 
     # Load the dataset
     smiles, y = load_data_from_tdc(dataset)
     X, mask = featurize(
-        smiles, 
-        representation, 
+        smiles,
+        representation,
         standardize_fn=DEFAULT_PREPROCESSING[representation],
         disable_logs=True,
     )
@@ -59,76 +59,76 @@ def cli(
     y_pred = []
     y_true = []
     y_uncertainty = []
-    
+
     for seed in range(n_seeds):
-        
+
         # Randomly split the dataset
         # This ensures that the distribution of distances from val to train is relatively uniform
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=seed)
         X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=seed)
-        
+
         file_name = f"best_hparams_{dataset}_{baseline_algorithm}_{representation}_{seed}.yaml"
         out_path = dm.fs.join(out_dir, file_name)
-        
+
         if dm.fs.exists(out_path):
             # Load the data of the completed hyper-param study if it already exists
             logger.info(f"Loading the best hyper-params from {out_path}")
             with fsspec.open(out_path) as fd:
                 params = yaml.safe_load(fd)
-            
+
         else:
-            
+
             # Run a hyper-parameter search
             study = tune_model(
-                X_train=X_train, 
-                X_test=X_val, 
-                y_train=y_train, 
-                y_test=y_val, 
-                name=baseline_algorithm, 
-                is_regression=is_regression, 
+                X_train=X_train,
+                X_test=X_val,
+                y_train=y_train,
+                y_test=y_val,
+                name=baseline_algorithm,
+                is_regression=is_regression,
                 metric=perf_metric,
                 global_seed=seed,
                 n_trials=n_trials,
                 n_startup_trials=n_startup_trials,
             )
-            
+
             params = study.best_params
             random_state = seed + study.best_trial.number
             params["random_state"] = random_state
-            
+
             logger.info(f"Saving the best hyper-params to {out_path}")
             with fsspec.open(out_path, "w") as fd:
                 yaml.dump(params, fd)
-                
+
             file_name = f"trials_{dataset}_{baseline_algorithm}_{representation}_{seed}.csv"
             out_path = dm.fs.join(out_dir, file_name)
-            
+
             logger.info(f"Saving the trials dataframe to {out_path}")
             study.trials_dataframe().to_csv(out_path)
-        
+
         random_state = params.pop("random_state")
         model = train_model(
-            X_train, 
-            y_train, 
-            baseline_algorithm, 
-            is_regression, 
-            params, 
+            X_train,
+            y_train,
+            baseline_algorithm,
+            is_regression,
+            params,
             random_state,
-            for_uncertainty_estimation=True, 
+            for_uncertainty_estimation=True,
             ensemble_size=10,
         )
-        
+
         y_pred_ = model.predict(X_test)
         y_uncertainty_ = predict_uncertainty(model, X_test)
-        
+
         y_pred.append(y_pred_)
         y_true.append(y_test)
         y_uncertainty.append(y_uncertainty_)
-        
+
         dist_train_, dist_test_ = compute_knn_distance(X_train, [X_train, X_test])
         dist_train.append(dist_train_)
         dist_test.append(dist_test_)
-    
+
     dist_test = np.concatenate(dist_test)
     dist_train = np.concatenate(dist_train)
     y_pred = np.concatenate(y_pred)
@@ -136,8 +136,12 @@ def cli(
     y_uncertainty = np.concatenate(y_uncertainty)
 
     # Collect the distances of the downstream applications
-    dist_scr = load_distances_for_downstream_application("virtual_screening", representation, dataset, update_cache=True)
-    dist_opt = load_distances_for_downstream_application("optimization", representation, dataset, update_cache=True)
+    dist_scr = load_distances_for_downstream_application(
+        "virtual_screening", representation, dataset, update_cache=True
+    )
+    dist_opt = load_distances_for_downstream_application(
+        "optimization", representation, dataset, update_cache=True
+    )
     dist_app = np.concatenate((dist_opt, dist_scr))
 
     # Compute the difference in IID and OOD performance and calibration
@@ -154,25 +158,27 @@ def cli(
     calibration_ood = cali_metric(y_true[mask], y_pred[mask], y_uncertainty[mask])
     logger.info(f"Found an OOD {perf_metric.name} score of {score_ood:.3f}")
     logger.info(f"Found an OOD {cali_metric.name} calibration score of {calibration_ood:.3f}")
-    
+
     file_name = f"gap_{dataset}_{baseline_algorithm}_{representation}.csv"
     out_path = dm.fs.join(out_dir, file_name)
     if dm.fs.exists(out_path) and not overwrite:
         raise RuntimeError(f"{out_path} already exists!")
-    
-    # Saving this as a CSV might be a bit wasteful, 
+
+    # Saving this as a CSV might be a bit wasteful,
     # but it's convenient
     logger.info(f"Saving the IID/OOD gap data to {out_path}")
-        
-    pd.DataFrame({
-        "dataset": dataset,
-        "algorithm": baseline_algorithm,
-        "representation": representation,
-        "iid_score": [score_iid, calibration_iid],
-        "ood_score": [score_ood, calibration_ood],
-        "metric": [perf_metric.name, cali_metric.name],
-        "type": ["performance", "calibration"]
-    }).to_csv(out_path, index=False)
+
+    pd.DataFrame(
+        {
+            "dataset": dataset,
+            "algorithm": baseline_algorithm,
+            "representation": representation,
+            "iid_score": [score_iid, calibration_iid],
+            "ood_score": [score_ood, calibration_ood],
+            "metric": [perf_metric.name, cali_metric.name],
+            "type": ["performance", "calibration"],
+        }
+    ).to_csv(out_path, index=False)
 
     # Compute the performance over distance
     df = pd.DataFrame()
@@ -193,17 +199,19 @@ def cli(
             targets=target, predictions=preds, uncertainties=uncertainty, metric=cali_metric, n_jobs=-1
         )
 
-        df_ = pd.DataFrame({
-            "dataset": dataset,
-            "algorithm": baseline_algorithm,
-            "representation": representation,
-            "distance": distance,
-            "score_mu": [perf_mu, cali_mu],
-            "score_std": [perf_std, cali_std],
-            "type":  ["performance", "calibration"],
-            "metric": [perf_metric.name, cali_metric.name],
-            "n_samples": n_samples,
-        })
+        df_ = pd.DataFrame(
+            {
+                "dataset": dataset,
+                "algorithm": baseline_algorithm,
+                "representation": representation,
+                "distance": distance,
+                "score_mu": [perf_mu, cali_mu],
+                "score_std": [perf_std, cali_std],
+                "type": ["performance", "calibration"],
+                "metric": [perf_metric.name, cali_metric.name],
+                "n_samples": n_samples,
+            }
+        )
         df = pd.concat((df, df_), ignore_index=True)
 
     file_name = f"perf_over_distance_{dataset}_{baseline_algorithm}_{representation}.csv"
