@@ -1,4 +1,3 @@
-import fsspec
 import tempfile
 import uuid
 

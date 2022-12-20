@@ -3,8 +3,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import numpy as np
-from PIL import Image
-from typing import Optional, List, Dict
+from typing import Optional, List
 from mood.utils import get_outlier_bounds
 from mood.metrics import Metric
 

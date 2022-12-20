@@ -1,14 +1,13 @@
 import datamol as dm
 import numpy as np
 
-from functools import partial
-from typing import Optional, Callable, List
+from typing import Optional, List
 from tdc.single_pred import ADME, Tox
 from tdc.metadata import dataset_names
 from mood.constants import CACHE_DIR
 
 
-def load_data_from_tdc(name: str, progress: bool = True, disable_logs: bool = False):
+def load_data_from_tdc(name: str, disable_logs: bool = False):
 
     original_name = name
     if name in MOOD_TO_TDC:
@@ -43,7 +42,6 @@ def load_data_from_tdc(name: str, progress: bool = True, disable_logs: bool = Fa
 
 def dataset_iterator(
     disable_logs: bool = True,
-    progress: bool = False,
     whitelist: Optional[List[str]] = None,
     blacklist: Optional[List[str]] = None,
 ):
@@ -60,7 +58,7 @@ def dataset_iterator(
         all_datasets = [d for d in all_datasets if d not in blacklist]
 
     for name in all_datasets:
-        yield name, load_data_from_tdc(name, progress, disable_logs)
+        yield name, load_data_from_tdc(name, disable_logs)
 
 
 TDC_TO_MOOD = {

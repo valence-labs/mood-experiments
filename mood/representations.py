@@ -14,8 +14,6 @@ from copy import deepcopy
 from rdkit import Chem
 from rdkit.Chem.QED import properties
 from rdkit.Chem import Descriptors
-from rdkit.Chem import Descriptors3D
-from rdkit.Chem import rdchem
 from rdkit.Chem import FindMolChiralCenters
 from rdkit.Chem import rdPartialCharges
 from rdkit.Chem import rdMolDescriptors

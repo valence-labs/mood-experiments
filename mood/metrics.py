@@ -6,7 +6,7 @@ from typing import Callable, Optional
 
 from sklearn.metrics import roc_auc_score
 from torchmetrics.functional import mean_absolute_error, mean_squared_error
-from torchmetrics.functional.classification import binary_auroc, auroc
+from torchmetrics.functional.classification import binary_auroc
 from torchmetrics.functional.regression.spearman import (
     _spearman_corrcoef_update,
     spearman_corrcoef,

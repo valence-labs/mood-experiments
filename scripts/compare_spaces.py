@@ -3,7 +3,6 @@ import fsspec
 import datamol as dm
 import numpy as np
 import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
 
 from datetime import datetime
@@ -15,13 +14,13 @@ from sklearn.metrics import r2_score
 from sklearn.gaussian_process.kernels import PairwiseKernel, Sum, WhiteKernel
 from sklearn.gaussian_process import GaussianProcessRegressor, GaussianProcessClassifier
 
-from mood.dataset import dataset_iterator, load_data_from_tdc, MOOD_REGR_DATASETS, MOOD_CLSF_DATASETS
+from mood.dataset import dataset_iterator, MOOD_REGR_DATASETS
 from mood.model_space import ModelSpaceTransformer
 from mood.preprocessing import DEFAULT_PREPROCESSING
 from mood.distance import compute_knn_distance
 from mood.visualize import plot_distance_distributions
 from mood.representations import representation_iterator, featurize
-from mood.constants import DOWNSTREAM_APPS_DATA_DIR, DOWNSTREAM_RESULTS_DIR
+from mood.constants import DOWNSTREAM_RESULTS_DIR
 from mood.utils import (
     load_representation_for_downstream_application,
     save_figure_with_fsspec,
@@ -119,7 +118,7 @@ def cli(
 
     df_corr = pd.DataFrame()
 
-    dataset_it = dataset_iterator(progress=True, blacklist=skip_dataset)
+    dataset_it = dataset_iterator(blacklist=skip_dataset)
 
     for dataset, (smiles, y) in dataset_it:
 

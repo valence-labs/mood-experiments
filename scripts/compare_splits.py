@@ -2,8 +2,6 @@ import fsspec
 import numpy as np
 import pandas as pd
 import datamol as dm
-import seaborn as sns
-import matplotlib.pyplot as plt
 
 from loguru import logger
 from typing import Optional, List
@@ -44,7 +42,7 @@ def cli(
     data_out_dir = dm.fs.join(base_save_dir, "numpy", "compare_splits", sub_save_dir)
     dm.fs.mkdir(data_out_dir, exist_ok=True)
 
-    dataset_it = dataset_iterator(progress=True, blacklist=skip_dataset)
+    dataset_it = dataset_iterator(blacklist=skip_dataset)
     for dataset, (smiles, y) in dataset_it:
 
         representation_it = representation_iterator(

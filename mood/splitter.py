@@ -4,13 +4,10 @@ import numpy as np
 import datamol as dm
 import seaborn as sns
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.cm import ScalarMappable
 
 from sklearn.model_selection import ShuffleSplit
 from dataclasses import dataclass
 from loguru import logger
-from collections import defaultdict
 from typing import Union, List, Optional, Callable, Dict
 
 from scipy.stats import gaussian_kde

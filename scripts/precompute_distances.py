@@ -1,11 +1,7 @@
-import os
-import typer
-
 import pandas as pd
 import datamol as dm
 
 from typing import Optional, List
-from mood.preprocessing import standardize_smiles
 from mood.dataset import dataset_iterator
 from mood.representations import representation_iterator
 from mood.constants import DOWNSTREAM_APPS_DATA_DIR
@@ -32,7 +28,6 @@ def cli(
     representation: Optional[List[str]] = None,
     dataset: Optional[List[str]] = None,
     verbose: bool = False,
-    batch_size: int = 16,
 ):
 
     if len(dataset) == 0:
@@ -40,7 +35,7 @@ def cli(
     if len(representation) == 0:
         representation = None
 
-    for dataset, (smiles, y) in dataset_iterator(progress=verbose, whitelist=dataset, disable_logs=True):
+    for dataset, (smiles, y) in dataset_iterator(whitelist=dataset, disable_logs=True):
 
         it = representation_iterator(
             smiles,
@@ -52,8 +47,6 @@ def cli(
         )
 
         for representation, (X, mask) in it:
-
-            y_repr = y[mask]
 
             virtual_screening, vs_compounds = load_representation_for_downstream_application(
                 "virtual_screening",

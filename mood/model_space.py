@@ -1,14 +1,11 @@
-import datamol as dm
 import numpy as np
 
-from typing import Union, Optional
+from typing import Union
 
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.gaussian_process import GaussianProcessRegressor, GaussianProcessClassifier
 from sklearn.gaussian_process.kernels import PairwiseKernel, Sum
-
-from sklearn.preprocessing import OneHotEncoder
 
 
 _SKLEARN_MLP_TYPE = Union[MLPRegressor, MLPClassifier]

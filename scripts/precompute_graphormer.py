@@ -1,4 +1,3 @@
-import os
 import typer
 
 import pandas as pd
@@ -79,7 +78,7 @@ def cli(
         df[["unique_id", "representation"]].to_parquet(out_path)
 
     blacklist = [app for app in MOOD_DATASETS if app in skip]
-    for dataset, (smiles, _) in dataset_iterator(progress=verbose, blacklist=blacklist, disable_logs=True):
+    for dataset, (smiles, _) in dataset_iterator(blacklist=blacklist, disable_logs=True):
 
         logger.info(f"Dataset {dataset}")
         out_path = dm.fs.join(DATASET_DATA_DIR, "representations", dataset, f"Graphormer.parquet")
