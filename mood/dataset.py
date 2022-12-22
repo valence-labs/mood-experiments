@@ -2,9 +2,28 @@ import datamol as dm
 import numpy as np
 
 from typing import Optional, List
+
+import torch.utils.data
 from tdc.single_pred import ADME, Tox
 from tdc.metadata import dataset_names
+
+from mood.chemistry import compute_murcko_scaffold
 from mood.constants import CACHE_DIR
+
+
+class SimpleMolecularDataset(torch.utils.data.Dataset):
+
+    def __init__(self, smiles, X, y):
+        self.smiles = smiles
+        self.X = X
+        self.y = y
+        self.domains = dm.utils.parallelized(compute_murcko_scaffold, self.smiles)
+
+    def __getitem__(self, index):
+        return (self.X[index], self.domains[index]), self.y[index]
+
+    def __len__(self):
+        return len(self.X)
 
 
 def load_data_from_tdc(name: str, disable_logs: bool = False):

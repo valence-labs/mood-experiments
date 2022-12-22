@@ -15,7 +15,7 @@ from mood.constants import DOWNSTREAM_RESULTS_DIR
 from mood.dataset import load_data_from_tdc, MOOD_REGR_DATASETS
 from mood.metrics import Metric, compute_bootstrapped_metric
 from mood.representations import featurize
-from mood.baselines import tune_model, train_model, predict_uncertainty
+from mood.baselines import basic_tuning_loop, train_model, predict_uncertainty
 from mood.utils import bin_with_overlap, load_distances_for_downstream_application
 from mood.distance import compute_knn_distance
 from mood.preprocessing import DEFAULT_PREPROCESSING
@@ -79,7 +79,7 @@ def cli(
         else:
 
             # Run a hyper-parameter search
-            study = tune_model(
+            study = basic_tuning_loop(
                 X_train=X_train,
                 X_test=X_val,
                 y_train=y_train,

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from typing import Optional
 from loguru import logger
 
-from mood.distance import get_metric
+from mood.distance import get_distance_metric
 from mood.representations import featurize
 from mood.dataset import load_data_from_tdc
 from mood.utils import load_distances_for_downstream_application
@@ -35,7 +35,7 @@ def cli(
     X, mask = featurize(smiles, representation, standardize_fn, disable_logs=True)
     y = y[mask]
 
-    metric = get_metric(X)
+    metric = get_distance_metric(X)
     if metric == "jaccard":
         X = X.astype(bool)
 

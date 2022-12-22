@@ -13,7 +13,7 @@ from mood.splitter import MOODSplitter, get_mood_splitters
 from mood.preprocessing import DEFAULT_PREPROCESSING
 from mood.utils import load_distances_for_downstream_application, save_figure_with_fsspec
 from mood.constants import DOWNSTREAM_RESULTS_DIR
-from mood.distance import get_metric
+from mood.distance import get_distance_metric
 
 
 def cli(
@@ -66,7 +66,7 @@ def cli(
                 "optimization", representation, dataset, update_cache=not use_cache
             )
 
-            metric = get_metric(X)
+            metric = get_distance_metric(X)
             if metric == "jaccard":
                 X = X.astype(bool)
 

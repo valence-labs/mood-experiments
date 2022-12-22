@@ -100,6 +100,8 @@ class Metric:
         target_type: TargetType,
         needs_predictions: bool = True,
         needs_uncertainty: bool = False,
+        range_min: Optional[float] = None,
+        range_max: Optional[float] = None,
     ):
         self.fn_ = fn
         self.name = name
@@ -107,6 +109,8 @@ class Metric:
         self.target_type = target_type
         self.needs_predictions = needs_predictions
         self.needs_uncertainty = needs_uncertainty
+        self.range_min = range_min
+        self.range_max = range_max
 
     @classmethod
     def get_default_calibration_metric(cls, dataset):
@@ -129,14 +133,14 @@ class Metric:
     @classmethod
     def by_name(cls, name):
         if name == "MAE":
-            return cls("MAE", weighted_mae, "min", TargetType.REGRESSION, True, False)
+            return cls("MAE", weighted_mae, "min", TargetType.REGRESSION, True, False, 0, None)
         elif name == "Spearman":
-            return cls("Spearman", weighted_spearman_calibration, "max", TargetType.REGRESSION, True, True)
+            return cls("Spearman", weighted_spearman_calibration, "max", TargetType.REGRESSION, True, True, -1, 1)
         elif name == "AUROC":
-            return cls("AUROC", weighted_auroc, "max", TargetType.BINARY_CLASSIFICATION, True, False)
+            return cls("AUROC", weighted_auroc, "max", TargetType.BINARY_CLASSIFICATION, True, False, 0, 1)
         elif name == "Brier score":
             return cls(
-                "Brier score", weighted_brier_score, "min", TargetType.BINARY_CLASSIFICATION, False, True
+                "Brier score", weighted_brier_score, "min", TargetType.BINARY_CLASSIFICATION, False, True, 0, 1
             )
 
     def __call__(
@@ -170,6 +174,10 @@ class Metric:
     @staticmethod
     def preprocess_uncertainties(uncertainty, device):
         return Metric.preprocess_predictions(uncertainty, device)
+
+    @property
+    def range(self):
+        return self.range_min, self.range_max
 
     def to_kwargs(self, y_true, y_pred, uncertainty, sample_weights):
         kwargs = {"target": self.preprocess_targets(y_true), "sample_weights": sample_weights}

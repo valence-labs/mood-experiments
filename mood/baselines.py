@@ -1,10 +1,13 @@
+import warnings
 import optuna
 import numpy as np
 import datamol as dm
 
 from typing import Optional
-from scipy.stats import entropy
 
+import sklearn.exceptions
+from scipy.stats import entropy
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, VotingRegressor, VotingClassifier
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.gaussian_process import GaussianProcessRegressor, GaussianProcessClassifier
@@ -110,7 +113,11 @@ def train_model(
         params["kernel"], params = construct_kernel(is_regression, params)
 
     model = get_baseline_model(name, is_regression, params, for_uncertainty_estimation, ensemble_size)
-    model.fit(X, y)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        model.fit(X, y)
+
     return model
 
 
@@ -194,7 +201,7 @@ def suggest_baseline_hparams(name: str, is_regression: bool, trial: optuna.Trial
     return fs[name](trial, is_regression)
 
 
-def tune_model(
+def basic_tuning_loop(
     X_train,
     X_test,
     y_train,
@@ -208,6 +215,11 @@ def tune_model(
     n_trials: int = 100,
     n_startup_trials: int = 20,
 ):
+
+    # NOTE: This could be merged with the more elaborate tuning loop we wrote later
+    #   However, for the sake of reproducibility, I wanted to keep this code intact.
+    #   This way, the exact code used to generate results is still in the code base.
+
     def run_trial(trial):
         random_state = global_seed + trial.number
         params = suggest_baseline_hparams(name, is_regression, trial)

@@ -5,7 +5,7 @@ from typing import Optional, Union, List
 from sklearn.neighbors import NearestNeighbors
 
 
-def get_metric(example):
+def get_distance_metric(example):
     """Get the appropiate distance metric given an exemplary datapoint"""
 
     # By default we use the Euclidean distance
@@ -40,32 +40,27 @@ def compute_knn_distance(
     """
 
     if metric is None:
-        metric = get_metric(X[0])
+        metric = get_distance_metric(X[0])
 
-    knn = NearestNeighbors(n_neighbors=k, metric=metric)
+    knn = NearestNeighbors(n_neighbors=k, metric=metric, n_jobs=n_jobs)
     knn.fit(X)
 
-    if Y is None:
-        # if Y is not specified, we compute the distance of X to itself
-        Y = X
+    if not isinstance(Y, list):
+        Y = [Y]
 
-    else:
-        if not isinstance(Y, list):
-            Y = [Y]
+    distances, indices = [], []
+    for queries in Y:
 
-        distances, indices = [], []
-        for queries in Y:
+        if np.array_equal(X, queries):
+            # Use k + 1 and filter out the first
+            # because the sample will always be its own neighbor
+            dist, ind = knn.kneighbors(queries, n_neighbors=k + 1)
+            dist, ind = dist[:, 1:], ind[:, 1:]
+        else:
+            dist, ind = knn.kneighbors(queries, n_neighbors=k)
 
-            if np.array_equal(X, queries):
-                # Use k + 1 and filter out the first
-                # because the sample will always be its own neighbor
-                dist, ind = knn.kneighbors(queries, n_neighbors=k + 1)
-                dist, ind = dist[:, 1:], ind[:, 1:]
-            else:
-                dist, ind = knn.kneighbors(queries, n_neighbors=k)
-
-            distances.append(dist)
-            indices.append(ind)
+        distances.append(dist)
+        indices.append(ind)
 
     # The distance from the query molecule to its NNs is the mean of all pairwise distances
     distances = [np.mean(dist, axis=1) for dist in distances]

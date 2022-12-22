@@ -19,9 +19,12 @@ from sklearn.model_selection._split import _validate_shuffle_split, _num_samples
 from sklearn.cluster import MiniBatchKMeans
 
 from mood.transformer import EmpiricalKernelMapTransformer
-from mood.distance import get_metric
+from mood.distance import get_distance_metric
 from mood.visualize import plot_distance_distributions
 from mood.utils import get_outlier_bounds
+
+
+MOOD_SPLITTERS = ["Random", "Scaffold", "Perimeter", "Maximum Dissimilarity"]
 
 
 def get_mood_splitters(smiles, n_splits: int = 5, random_state: int = 0, n_jobs: Optional[int] = None):
@@ -105,14 +108,8 @@ class MOODSplitter(BaseShuffleSplit):
     downstream applications.
     """
 
-    def __init__(
-        self,
-        splitters: Dict[str, BaseShuffleSplit],
-        downstream_distances: Optional[np.ndarray] = None,
-        metric: Union[str, Callable] = "minkowski",
-        p: int = 2,
-        k: int = 5,
-    ):
+    def __init__(self, splitters: Dict[str, BaseShuffleSplit], downstream_distances: Optional[np.ndarray] = None,
+                 metric: Union[str, Callable] = "minkowski", p: int = 2, k: int = 5):
         """
         Args:
             splitters: A list of splitter methods you are considering
@@ -121,6 +118,7 @@ class MOODSplitter(BaseShuffleSplit):
             p: If the metric is the minkowski distance, this is the p in that distance.
             k: The number of nearest neighbors to use to compute the distance.
         """
+        super().__init__()
         if not all(isinstance(obj, BaseShuffleSplit) for obj in splitters.values()):
             raise TypeError("All splitters should be BaseShuffleSplit objects")
 
@@ -196,7 +194,7 @@ class MOODSplitter(BaseShuffleSplit):
         return distances
 
     def get_prescribed_splitter(self):
-        return self.splitters[self.prescribed_splitter_label]
+        return self._splitters[self.prescribed_splitter_label]
 
     def get_protocol_results(self):
         return SplitCharacterization.as_dataframe(self._split_chars)
@@ -262,7 +260,7 @@ class MOODSplitter(BaseShuffleSplit):
         """Generate (train, test) indices"""
         if not self.fitted:
             raise RuntimeError("The splitter has not be fitted yet")
-        yield from self._prescribed_splitter._iter_indices(X, y, groups)
+        yield from self.get_prescribed_splitter()._iter_indices(X, y, groups)
 
 
 class PredefinedGroupShuffleSplit(GroupShuffleSplit):
@@ -301,7 +299,7 @@ class KMeansSplit(GroupShuffleSplit):
         self._n_clusters = n_clusters
 
     def compute_kmeans_clustering(self, X, random_state_offset: int = 0, return_centers: bool = False):
-        metric = get_metric(X)
+        metric = get_distance_metric(X)
         
         if self.random_state is not None: 
             seed = self.random_state + random_state_offset
@@ -449,7 +447,7 @@ class MaxDissimilaritySplit(KMeansSplit):
         if groups is not None:
             logger.warning("Ignoring the groups parameter in favor of the predefined groups")
            
-        metric = get_metric(X)
+        metric = get_distance_metric(X)
 
         n_samples = _num_samples(X)
         n_train, n_test = _validate_shuffle_split(
