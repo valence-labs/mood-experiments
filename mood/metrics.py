@@ -157,9 +157,12 @@ class Metric:
         if not isinstance(y_true, torch.Tensor):
             y_true = torch.tensor(y_true)
         if self.target_type.is_regression():
-            y_true = y_true.float()
+            y_true = y_true.float().squeeze()
+            if y_true.ndim == 0:
+                y_true = y_true.unsqueeze(0)
         else:
             y_true = y_true.int()
+
         return y_true
 
     @staticmethod
@@ -175,12 +178,19 @@ class Metric:
     def preprocess_uncertainties(uncertainty, device):
         return Metric.preprocess_predictions(uncertainty, device)
 
+    @staticmethod
+    def preprocess_sample_weights(sample_weights, device):
+        if sample_weights is not None and not isinstance(sample_weights, torch.Tensor):
+            sample_weights = torch.tensor(sample_weights, device=device)
+        return sample_weights
+
     @property
     def range(self):
         return self.range_min, self.range_max
 
     def to_kwargs(self, y_true, y_pred, uncertainty, sample_weights):
-        kwargs = {"target": self.preprocess_targets(y_true), "sample_weights": sample_weights}
+        kwargs = {"target": self.preprocess_targets(y_true)}
+        kwargs["sample_weights"] = self.preprocess_sample_weights(sample_weights, kwargs["target"].device)
         if self.needs_predictions:
             kwargs["preds"] = self.preprocess_predictions(y_pred, kwargs["target"].device)
         if self.needs_uncertainty:

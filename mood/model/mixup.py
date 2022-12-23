@@ -1,11 +1,9 @@
-from functools import partial
-from typing import Optional, List
+from typing import List
 
 import torch
 from torch import nn
 
 from mood.model.base import BaseModel
-from mood.model.nn import FCLayer
 from mood.model.utils import linear_interpolation
 
 
@@ -23,14 +21,13 @@ class Mixup(BaseModel):
     def __init__(
         self,
         base_network: nn.Module,
-        prediction_head: FCLayer,
+        prediction_head: nn.Module,
         loss_fn: nn.Module,
+        batch_size: int,
         penalty_weight: float,
         penalty_weight_schedule: List[int],
         lr: float = 1e-3,
         weight_decay: float = "auto",
-        optimizer="Adam",
-        lr_scheduler="ReduceLROnPlateau",
         augmentation_std: float = 0.1,
         no_augmentations: int = 10,
         alpha: float = 0.1,
@@ -52,14 +49,18 @@ class Mixup(BaseModel):
                 of the target domain.
             alpha: The parameter of the Beta distribution used to compute the interpolation factor
         """
-        super().__init__(optimizer, lr, lr_scheduler, weight_decay)
-        self.base_network = base_network
-        self.prediction_head = prediction_head
+        super().__init__(
+            lr=lr,
+            weight_decay=weight_decay,
+            base_network=base_network,
+            prediction_head=prediction_head,
+            loss_fn=loss_fn,
+            batch_size=batch_size,
+        )
 
         self._classification_loss = torch.nn.BCELoss()
         self._target_domain_loss = torch.nn.MSELoss()
 
-        self._loss_fn = partial(self.loss_function_wrapper, loss_fn=loss_fn)
         self._augmentation_std = augmentation_std
         self._no_augmentations = no_augmentations
 
@@ -71,18 +72,12 @@ class Mixup(BaseModel):
         self.start = penalty_weight_schedule[0]
         self.duration = penalty_weight_schedule[1] - penalty_weight_schedule[0]
 
-    def forward(self, x, domains: Optional = None, return_embedding: bool = False):
-        embedding = self.base_network(x)
-        label = self.prediction_head(embedding)
-        out = (label, embedding) if return_embedding else label
-        return out
-
     def _step(self, batch, batch_idx=0, optimizer_idx=None):
 
         if not self.training:
             (x, domains), y_true = batch
             y_pred = self.forward(x)
-            loss = self._loss_fn(y_pred, y_true)
+            loss = self.loss_fn(y_pred, y_true)
             self.log("loss", loss)
             return loss
 
@@ -133,7 +128,7 @@ class Mixup(BaseModel):
         if inter_domain:
 
             # Predictive loss
-            loss_q = self._loss_fn(y_pred_st, y_st)
+            loss_q = self.loss_fn(y_pred_st, y_st)
 
             # Consistency regularizer
             y_pred_s, phi_s = self.forward(x_src, return_embedding=True)
@@ -144,7 +139,7 @@ class Mixup(BaseModel):
 
         # Intra target domain
         else:
-            loss = self._loss_fn(y_pred_st, y_st)
+            loss = self.loss_fn(y_pred_st, y_st)
 
         return loss
 
@@ -167,3 +162,13 @@ class Mixup(BaseModel):
         xi_st = lam_prime * x_s + (1.0 - lam_prime) * x_t
         yi_st = lam_prime * y_s + (1.0 - lam_prime) * y_t
         return xi_st, yi_st
+
+    @staticmethod
+    def suggest_params(trial):
+        params = BaseModel.suggest_params(trial)
+        params["penalty_weight"] = trial.suggest_float("penalty_weight", 0.0001, 100, log=True)
+        params["penalty_weight_schedule"] = trial.suggest_categorical("penalty_weight_schedule", [[0, 25], [0, 50], [0, 0], [25, 50]])
+        params["augmentation_std"] = trial.suggest_categorical("augmentation_std", 0.001, 0.15)
+        params["no_augmentations"] = trial.suggest_categorical("no_augmentations", [3, 5, 10])
+        params["alpha"] = trial.suggest_float("alpha", 0.0, 1.0)
+        return params

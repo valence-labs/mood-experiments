@@ -1,5 +1,4 @@
-from functools import partial
-from typing import Optional, List
+from typing import List
 
 import torch
 from torch import nn
@@ -26,12 +25,11 @@ class InformationBottleneckERM(BaseModel):
         base_network: nn.Module,
         prediction_head: nn.Module,
         loss_fn: nn.Module,
+        batch_size: int,
         penalty_weight: float,
         penalty_weight_schedule: List[int],
-        optimizer="Adam",
         lr=1e-3,
-        lr_scheduler="ReduceLROnPlateau",
-        weight_decay=0,
+        weight_decay=0
     ):
         """
         Args:
@@ -47,27 +45,19 @@ class InformationBottleneckERM(BaseModel):
         """
 
         super().__init__(
-            optimizer=optimizer,
             lr=lr,
-            lr_scheduler=lr_scheduler,
             weight_decay=weight_decay,
+            base_network=base_network,
+            prediction_head=prediction_head,
+            loss_fn=loss_fn,
+            batch_size=batch_size,
         )
-
-        self.base_network = base_network
-        self.prediction_head = prediction_head
-        self._loss_fn = partial(self.loss_function_wrapper, loss_fn=loss_fn)
 
         self.penalty_weight = penalty_weight
         if len(penalty_weight_schedule) != 2:
             raise ValueError("The penalty weight schedule needs to define two values; The start and end step")
         self.start = penalty_weight_schedule[0]
         self.duration = penalty_weight_schedule[1] - penalty_weight_schedule[0]
-
-    def forward(self, x, domains: Optional = None, return_embedding: bool = False):
-        embedding = self.base_network(x)
-        label = self.prediction_head(embedding)
-        out = (label, embedding) if return_embedding else label
-        return out
 
     def _step(self, batch, batch_idx=0, optimizer_idx=None):
 
@@ -77,7 +67,7 @@ class InformationBottleneckERM(BaseModel):
         for mini_batch in batch:
             (xs, _), y_true = mini_batch
             y_pred, phi = self.forward(xs, return_embedding=True)
-            erm_loss += self._loss_fn(y_pred, y_true)
+            erm_loss += self.loss_fn(y_pred, y_true)
             phis.append(phi)
 
         erm_loss /= len(batch)
@@ -112,3 +102,10 @@ class InformationBottleneckERM(BaseModel):
         if len(features) == 1:
             return 0.0
         return features.var(dim=0).mean()
+
+    @staticmethod
+    def suggest_params(trial):
+        params = BaseModel.suggest_params(trial)
+        params["penalty_weight"] = trial.suggest_float("penalty_weight", 0.0001, 100, log=True)
+        params["penalty_weight_schedule"] = trial.suggest_categorical("penalty_weight_schedule", [[0, 25], [0, 50], [0, 0], [25, 50]])
+        return params

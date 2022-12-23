@@ -1,9 +1,11 @@
+from typing import Optional
+
 import torch
 
 from torch import nn
 from torch.nn import Flatten
 
-from good.utils.torchutils import get_activation
+from mood.model.utils import get_activation
 
 
 class FCLayer(nn.Module):
@@ -106,7 +108,7 @@ class MLP(nn.Module):
             size of the input
         hidden_sizes: int list or int
             size of the hidden layers
-        out_sizes: int list or int or None
+        out_size: int list or int or None
             if None, uses the last hidden size as the output
         activation: str or callable
             activation function. Should be supported by :func:`ivbase.nn.commons.get_activation`
@@ -176,3 +178,27 @@ class MLP(nn.Module):
         x = Flatten()(x)
         res = self.extractor(x)
         return res
+
+
+def get_simple_mlp(
+        input_size: int,
+        width: int = 0,
+        depth: int = 0,
+        out_size: Optional[int] = 1,
+        is_regression: Optional[bool] = None,
+):
+    if out_size is not None and not isinstance(is_regression, bool):
+        raise TypeError("Specify is_regression to be True or False")
+
+    if out_size is None:
+        out_activation = "ReLU"
+    else:
+        out_activation = None if is_regression else "Sigmoid"
+
+    return MLP(
+        input_size=input_size,
+        hidden_sizes=[width] * depth,
+        out_size=out_size,
+        activation="ReLU",
+        out_activation=out_activation,
+    )

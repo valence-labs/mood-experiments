@@ -26,7 +26,7 @@ from mood.utils import (
     save_figure_with_fsspec,
     get_outlier_bounds,
 )
-from mood.baselines import train_model
+from mood.train import train_baseline_model
 
 
 def train_gp(X, y, is_regression):
@@ -143,8 +143,8 @@ def cli(
             )
 
             is_regression = dataset in MOOD_REGR_DATASETS
-            mlp_model = train_model(X, y_repr, "MLP", is_regression)
-            rf_model = train_model(X, y_repr, "RF", is_regression)
+            mlp_model = train_baseline_model(X, y_repr, "MLP", is_regression)
+            rf_model = train_baseline_model(X, y_repr, "RF", is_regression)
             # We use a custom train function for GPs to include a retry system
             gp_model = train_gp(X, y_repr, is_regression)
 

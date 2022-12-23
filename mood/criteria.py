@@ -99,8 +99,8 @@ class CombinedCriterion(ModelSelectionCriterion):
         self.calibration_criterion = CalibrationCriterion(calibration_metric)
 
     def score(self, predictions, uncertainties, train: SimpleMolecularDataset, val: SimpleMolecularDataset):
-        cal_score = self.performance_criterion.score(predictions, uncertainties, train, val)
-        prf_score = self.calibration_criterion.score(predictions, uncertainties, train, val)
+        prf_score = self.performance_criterion.score(predictions, uncertainties, train, val)
+        cal_score = self.calibration_criterion.score(predictions, uncertainties, train, val)
 
         # Normalize to [0, 1]
         vmin, vmax = self.calibration_criterion.metric.range

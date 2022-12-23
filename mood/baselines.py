@@ -1,13 +1,8 @@
-import warnings
 import optuna
 import numpy as np
 import datamol as dm
 
-from typing import Optional
-
-import sklearn.exceptions
 from scipy.stats import entropy
-from sklearn.exceptions import ConvergenceWarning
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, VotingRegressor, VotingClassifier
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.gaussian_process import GaussianProcessRegressor, GaussianProcessClassifier
@@ -15,9 +10,8 @@ from sklearn.gaussian_process.kernels import PairwiseKernel, Sum, WhiteKernel
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.base import ClassifierMixin, clone
 
-from mood.metrics import Metric
 
-SUPPORTED_BASELINES = ["MLP", "RF", "GP"]
+MOOD_BASELINES = ["MLP", "RF", "GP"]
 
 
 def get_baseline_cls(name, is_regression):
@@ -72,7 +66,7 @@ def uncertainty_wrapper(model, ensemble_size: int = 10):
     return model
 
 
-def predict_uncertainty(model, X):
+def predict_baseline_uncertainty(model, X):
 
     if isinstance(model, ClassifierMixin):
         proba = model.predict_proba(X)[:, 1]
@@ -90,35 +84,6 @@ def predict_uncertainty(model, X):
         uncertainty = np.var(preds, axis=0)
 
     return uncertainty
-
-
-def train_model(
-    X,
-    y,
-    name: str,
-    is_regression: bool,
-    params: Optional[dict] = None,
-    seed: Optional[int] = None,
-    for_uncertainty_estimation: bool = False,
-    ensemble_size: int = 10,
-):
-    if params is None:
-        params = {}
-    if seed is not None:
-        params["random_state"] = seed
-
-    if name == "RF" and not is_regression:
-        params["class_weight"] = "balanced"
-    if name == "GP":
-        params["kernel"], params = construct_kernel(is_regression, params)
-
-    model = get_baseline_model(name, is_regression, params, for_uncertainty_estimation, ensemble_size)
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        model.fit(X, y)
-
-    return model
 
 
 def suggest_mlp_hparams(trial, is_regression):
@@ -199,56 +164,3 @@ def suggest_baseline_hparams(name: str, is_regression: bool, trial: optuna.Trial
         "GP": suggest_gp_hparams,
     }
     return fs[name](trial, is_regression)
-
-
-def basic_tuning_loop(
-    X_train,
-    X_test,
-    y_train,
-    y_test,
-    name: str,
-    is_regression: bool,
-    metric: Metric,
-    global_seed: int,
-    for_uncertainty_estimation: bool = False,
-    ensemble_size: int = 10,
-    n_trials: int = 100,
-    n_startup_trials: int = 20,
-):
-
-    # NOTE: This could be merged with the more elaborate tuning loop we wrote later
-    #   However, for the sake of reproducibility, I wanted to keep this code intact.
-    #   This way, the exact code used to generate results is still in the code base.
-
-    def run_trial(trial):
-        random_state = global_seed + trial.number
-        params = suggest_baseline_hparams(name, is_regression, trial)
-        model = train_model(
-            X_train,
-            y_train,
-            name,
-            is_regression,
-            params,
-            random_state,
-            for_uncertainty_estimation,
-            ensemble_size,
-        )
-        y_pred = model.predict(X_test)
-        score = metric(y_test, y_pred)
-        return score
-
-    direction = "maximize" if metric.mode == "max" else "minimize"
-    sampler = optuna.samplers.TPESampler(seed=global_seed, n_startup_trials=n_startup_trials)
-
-    study = optuna.create_study(direction=direction, sampler=sampler)
-
-    # ValueError: array must not contain infs or NaNs
-    # LinAlgError: N-th leading minor of the array is not positive definite
-    # LinAlgError: The kernel is not returning a positive definite matrix
-    if name == "GP":
-        catch = (np.linalg.LinAlgError, ValueError)
-    else:
-        catch = ()
-
-    study.optimize(run_trial, n_trials=n_trials, catch=catch)
-    return study

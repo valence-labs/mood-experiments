@@ -1,8 +1,4 @@
-from functools import partial
-from typing import Optional, Union
-
-import torch
-
+from typing import Optional
 from mood.model.base import BaseModel
 
 
@@ -15,33 +11,6 @@ class ERM(BaseModel):
         Vapnik, V. N. (1998). Statistical Learning Theory. Wiley-Interscience.
         https://www.wiley.com/en-fr/Statistical+Learning+Theory-p-9780471030034
     """
-
-    def __init__(
-        self,
-        base_network: torch.nn.Module,
-        loss_fn: torch.nn.Module,
-        optimizer: Union["str", torch.optim.Optimizer] = "Adam",
-        lr: float = 1e-3,
-        lr_scheduler: str = "ReduceLROnPlateau",
-        weight_decay="auto",
-    ):
-        """
-        Args:
-            base_network: The neural network architecture
-            loss_fn: The loss function to use when optimizing
-        """
-        super(ERM, self).__init__(
-            optimizer,
-            lr,
-            lr_scheduler,
-            weight_decay,
-        )
-        self.base_network = base_network
-        self.loss_fn = partial(self.loss_function_wrapper, loss_fn=loss_fn)
-
-    def forward(self, x, domains: Optional = None):
-        preds = self.base_network(x)
-        return preds
 
     def _step(self, batch, batch_idx, optimizer_idx: Optional[int] = None):
         (x, domain), y_true = batch

@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import datamol as dm
 import numpy as np
 
@@ -6,6 +8,7 @@ from typing import Optional, List
 import torch.utils.data
 from tdc.single_pred import ADME, Tox
 from tdc.metadata import dataset_names
+from torch.utils.data import default_collate
 
 from mood.chemistry import compute_murcko_scaffold
 from mood.constants import CACHE_DIR
@@ -17,13 +20,45 @@ class SimpleMolecularDataset(torch.utils.data.Dataset):
         self.smiles = smiles
         self.X = X
         self.y = y
-        self.domains = dm.utils.parallelized(compute_murcko_scaffold, self.smiles)
+        self.domains = np.array(dm.utils.parallelized(compute_murcko_scaffold, self.smiles))
 
     def __getitem__(self, index):
         return (self.X[index], self.domains[index]), self.y[index]
 
     def __len__(self):
         return len(self.X)
+
+    def filter_by_indices(self, indices):
+        cpy = deepcopy(self)
+        cpy.smiles = cpy.smiles[indices]
+        cpy.X = cpy.X[indices]
+        cpy.y = cpy.y[indices]
+        cpy.domains = cpy.domains[indices]
+        return cpy
+
+
+class DAMolecularDataset(torch.utils.data.Dataset):
+
+    def __init__(self, source_dataset: SimpleMolecularDataset, target_dataset: SimpleMolecularDataset):
+        self.src = source_dataset
+        self.tgt = target_dataset
+
+    def __getitem__(self, item):
+        src = self.src.__getitem__(item)
+        tgt_index = np.random.default_rng(item).integers(0, len(self.tgt))
+        (x, domain), y = self.tgt.__getitem__(tgt_index)
+        return {"source": src, "target": (x, domain)}
+
+    def __len__(self):
+        return len(self.src)
+
+
+def domain_based_collate(batch):
+    domains = [domain for (X, domain), y in batch]
+    _, inverse = np.unique(domains, return_inverse=True, axis=0)
+    for idx in np.unique(inverse):
+        indices = np.flatnonzero(inverse == idx)
+        yield default_collate([batch[i] for i in indices])
 
 
 def load_data_from_tdc(name: str, disable_logs: bool = False):

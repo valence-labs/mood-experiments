@@ -1,4 +1,4 @@
-from functools import partial
+from copy import deepcopy
 from typing import Optional
 
 import torch
@@ -24,13 +24,11 @@ class MTL(BaseModel):
     def __init__(
         self,
         base_network: nn.Module,
-        domain_network: nn.Module,
         prediction_head: nn.Module,
         loss_fn: nn.Module,
+        batch_size: int,
         lr: float = 1e-3,
         weight_decay: float = 0,
-        optimizer="Adam",
-        lr_scheduler="ReduceLROnPlateau",
     ):
         """
         Args:
@@ -40,11 +38,15 @@ class MTL(BaseModel):
                 representation of the domain and features and returns a task-specific prediction.
             loss_fn: The loss function to optimize for.
         """
-        super().__init__(optimizer, lr, lr_scheduler, weight_decay)
-        self.base_network = base_network
-        self.prediction_head = prediction_head
-        self.domain_network = domain_network
-        self._loss_fn = partial(self.loss_function_wrapper, loss_fn=loss_fn)
+        super().__init__(
+            lr=lr,
+            weight_decay=weight_decay,
+            base_network=base_network,
+            loss_fn=loss_fn,
+            prediction_head=prediction_head,
+            batch_size=batch_size,
+        )
+        self.domain_network = deepcopy(base_network)
 
     def forward(self, x, domains: Optional = None, return_embedding: bool = False):
         input_embeddings = self.base_network(x)
@@ -72,7 +74,7 @@ class MTL(BaseModel):
     def _loss(self, y_pred, y_true, ns):
         loss, i = 0, 0
         for n in ns:
-            loss += self._loss_fn(y_pred[i : i + n], y_true[i : i + n])
+            loss += self.loss_fn(y_pred[i : i + n], y_true[i : i + n])
             i += n
         loss = loss / len(ns)
         return loss

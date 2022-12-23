@@ -9,7 +9,7 @@ from mood.preprocessing import DEFAULT_PREPROCESSING
 from mood.visualize import plot_distance_distributions
 from mood.distance import compute_knn_distance
 from mood.utils import load_representation_for_downstream_application
-from mood.baselines import train_model
+from mood.train import train_baseline_model
 from mood.model_space import ModelSpaceTransformer
 
 
@@ -33,7 +33,7 @@ def cli(
 
         logger.info(f"Computing distance in the {model_space} model space")
         is_regression = dataset in MOOD_REGR_DATASETS
-        model = train_model(X, y, model_space, is_regression)
+        model = train_baseline_model(X, y, model_space, is_regression)
         embedding_size = int(round(X.shape[1] * 0.25))
         trans = ModelSpaceTransformer(model, embedding_size)
 

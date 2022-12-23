@@ -30,6 +30,7 @@ class DANN(BaseModel):
         base_network: nn.Module,
         prediction_head: FCLayer,
         loss_fn: nn.Module,
+        batch_size: int,
         penalty_weight: float,
         penalty_weight_schedule: List[int],
         discriminator_network: Optional[nn.Module] = None,
@@ -39,8 +40,6 @@ class DANN(BaseModel):
         discr_weight_decay: float = "auto",
         lambda_reg: float = 0.1,
         n_discr_steps_per_predictor_step=3,
-        optimizer="Adam",
-        lr_scheduler="ReduceLROnPlateau",
     ):
         """
         Args:
@@ -56,9 +55,14 @@ class DANN(BaseModel):
             discriminator_network: The discriminator network that predicts the domain from the hidden embedding.
             lambda_reg: An additional weighing factor for the penalty. Following the implementation of DomainBed.
         """
-        super().__init__(optimizer, lr, lr_scheduler, weight_decay)
-        self.base_network = base_network
-        self.prediction_head = prediction_head
+        super().__init__(
+            lr=lr,
+            weight_decay=weight_decay,
+            base_network=base_network,
+            prediction_head=prediction_head,
+            loss_fn=loss_fn,
+            batch_size=batch_size,
+        )
 
         self._discriminator_network = discriminator_network
         if self._discriminator_network is None:
@@ -71,7 +75,6 @@ class DANN(BaseModel):
         self.duration = penalty_weight_schedule[1] - penalty_weight_schedule[0]
 
         self._discriminator_loss = nn.CrossEntropyLoss()
-        self._loss_fn = partial(self.loss_function_wrapper, loss_fn=loss_fn)
         self.discr_lr = discr_lr
         self.discr_l2 = discr_weight_decay
         self.lambda_reg = lambda_reg
@@ -124,7 +127,7 @@ class DANN(BaseModel):
         if not self.training:
             (x, domains), y_true = batch
             y_pred = self.forward(x)
-            loss = self._loss_fn(y_pred, y_true)
+            loss = self.loss_fn(y_pred, y_true)
             self.log("loss", loss)
             return loss
 
@@ -140,7 +143,7 @@ class DANN(BaseModel):
             x_tgt, return_embedding=True, return_discriminator=True
         )
 
-        erm_loss = self._loss_fn(y_pred, y_true)
+        erm_loss = self.loss_fn(y_pred, y_true)
 
         # For losses w.r.t. the discriminator
         domain_pred = torch.cat([discr_out_src, discr_out_tgt], dim=0)
@@ -182,3 +185,14 @@ class DANN(BaseModel):
     def gradient_reversal(loss, inputs):
         grad = torch.cat(torch.autograd.grad(loss, inputs, create_graph=True))
         return (grad**2).sum(dim=1).mean(dim=0)
+
+    @staticmethod
+    def suggest_params(trial):
+        params = super().suggest_params(trial)
+        params["penalty_weight"] = trial.suggest_float(1e-10, 1.0, log=True)
+        params["penalty_weight_schedule"] = trial.suggest_float(1e-10, 1.0, log=True)
+        params["discr_lr"] = trial.suggest_float("discr_lr", 1e-8, 1.0, log=True)
+        params["discr_weight_decay"] = trial.suggest_categorical("discr_weight_decay", ["auto", 0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0])
+        params["lambda_reg"] = trial.suggest_float("lambda_reg", 0.001, 10, log=True)
+        params["n_discr_steps_per_predictor_step"] = trial.suggest_int("n_discr_steps_per_predictor_step", 1, 5)
+        return params

@@ -15,7 +15,9 @@ from mood.constants import DOWNSTREAM_RESULTS_DIR
 from mood.dataset import load_data_from_tdc, MOOD_REGR_DATASETS
 from mood.metrics import Metric, compute_bootstrapped_metric
 from mood.representations import featurize
-from mood.baselines import basic_tuning_loop, train_model, predict_uncertainty
+from mood.baselines import predict_baseline_uncertainty
+from mood.train import train_baseline_model
+from mood.experiment import basic_tuning_loop
 from mood.utils import bin_with_overlap, load_distances_for_downstream_application
 from mood.distance import compute_knn_distance
 from mood.preprocessing import DEFAULT_PREPROCESSING
@@ -107,7 +109,7 @@ def cli(
             study.trials_dataframe().to_csv(out_path)
 
         random_state = params.pop("random_state")
-        model = train_model(
+        model = train_baseline_model(
             X_train,
             y_train,
             baseline_algorithm,
@@ -119,7 +121,7 @@ def cli(
         )
 
         y_pred_ = model.predict(X_test)
-        y_uncertainty_ = predict_uncertainty(model, X_test)
+        y_uncertainty_ = predict_baseline_uncertainty(model, X_test)
 
         y_pred.append(y_pred_)
         y_true.append(y_test)

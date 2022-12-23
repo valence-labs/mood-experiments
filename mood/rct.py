@@ -1,32 +1,39 @@
 import itertools
+import numpy as np
 
-from mood.dataset import MOOD_DATASETS
+from mood.model import MOOD_ALGORITHMS
 from mood.representations import MOOD_REPRESENTATIONS
 from mood.splitter import MOOD_SPLITTERS
-from mood.baselines import SUPPORTED_BASELINES
+from mood.baselines import MOOD_BASELINES
+from mood.criteria import get_mood_criteria
+from mood.metrics import Metric
 
 
-# TODO: Update based on actual implementation
-MOOD_ALGORITHMS = SUPPORTED_BASELINES + ["CORAL", "DANN", "Mixup", "IB-ERM", "MTL", "VREx"]
+RCT_SEED = 1234
+NUM_SEEDS = 10
 
 
-# TODO: Update based on actual implementation
-MOOD_CRITERIA = ["performance", "calibration", "domain_weighted", "distance_weighted", "performance x calibration"]
+def get_experimental_configurations(dataset):
+    """
+    To randomly sample different configurations of the RCT experiment, we use a deterministic approach.
+    This facilitates reproducibility, but also makes it easy to run the experiment on preemptible instances.
+    Otherwise, it could happen that models that take longer to train have a higher chance of failing,
+    biasing the experiment.
+    """
 
-NUM_SEEDS = 128
+    prf_metric = Metric.get_default_performance_metric(dataset)
+    cal_metric = Metric.get_default_calibration_metric(dataset)
 
+    mood_criteria = get_mood_criteria(prf_metric, cal_metric).keys()
+    mood_algorithms = MOOD_BASELINES.pop(MOOD_BASELINES.index("MLP")) + MOOD_ALGORITHMS
 
-def get_experimental_configurations():
-    all_options = itertools.product(
-        MOOD_SPLITTERS,
+    all_options = list(itertools.product(
+        mood_algorithms,
         MOOD_REPRESENTATIONS,
-        MOOD_ALGORITHMS,
-        MOOD_CRITERIA,
-        list(range(10))
-    )
-    print(len(list(all_options)))
-
-
-
-if __name__ == "__main__":
-    get_experimental_configurations()
+        MOOD_SPLITTERS,
+        mood_criteria,
+        list(range(NUM_SEEDS)),
+    ))
+    rng = np.random.default_rng(RCT_SEED)
+    rng.shuffle(all_options)
+    return all_options

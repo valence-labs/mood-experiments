@@ -307,7 +307,7 @@ class KMeansSplit(GroupShuffleSplit):
             seed = None
 
         if metric != "euclidean":
-            logger.info(f"To use KMeans with the {metric} metric, we use the Empirical Kernel Map")
+            logger.debug(f"To use KMeans with the {metric} metric, we use the Empirical Kernel Map")
             transformer = EmpiricalKernelMapTransformer(
                 n_samples=min(512, len(X)),
                 metric=metric,

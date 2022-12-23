@@ -27,6 +27,7 @@ class VREx(BaseModel):
         base_network: nn.Module,
         prediction_head: nn.Module,
         loss_fn: nn.Module,
+        batch_size: int,
         penalty_weight: float,
         penalty_weight_schedule: List[int],
         lr=1e-3,
@@ -44,11 +45,14 @@ class VREx(BaseModel):
                 The second integer is the first epoch at which the penalty weight is its max value.
                 Linearly interpolates between the two.
         """
-        super().__init__(lr=lr, weight_decay=weight_decay)
-
-        self.base_network = base_network
-        self.prediction_head = prediction_head
-        self._loss_fn = partial(self.loss_function_wrapper, loss_fn=loss_fn)
+        super().__init__(
+            lr=lr,
+            weight_decay=weight_decay,
+            base_network=base_network,
+            prediction_head=prediction_head,
+            loss_fn=loss_fn,
+            batch_size=batch_size,
+        )
 
         self.penalty_weight = penalty_weight
         if len(penalty_weight_schedule) != 2:
@@ -56,18 +60,13 @@ class VREx(BaseModel):
         self.start = penalty_weight_schedule[0]
         self.duration = penalty_weight_schedule[1] - penalty_weight_schedule[0]
 
-    def forward(self, x, domains: Optional = None, return_embedding: bool = False):
-        embedding = self.base_network(x)
-        label = self.prediction_head(embedding)
-        return label
-
     def _step(self, batch, batch_idx=0, optimizer_idx=None):
 
         erm_losses = []
         for mini_batch in batch:
             (xs, _), y_true = mini_batch
-            y_pred = self.forward(xs, return_embedding=True)
-            erm_losses.append(self._loss_fn(y_pred, y_true))
+            y_pred = self.forward(xs, return_embedding=False)
+            erm_losses.append(self.loss_fn(y_pred, y_true))
 
         penalty_weight = linear_interpolation(
             step=self.current_epoch,
@@ -83,3 +82,10 @@ class VREx(BaseModel):
 
         self.log("loss", loss)
         return loss
+
+    @staticmethod
+    def suggest_params(trial):
+        params = BaseModel.suggest_params(trial)
+        params["penalty_weight"] = trial.suggest_float("penalty_weight", 0.0001, 100, log=True)
+        params["penalty_weight_schedule"] = trial.suggest_categorical("penalty_weight_schedule", [[0, 25], [0, 50], [0, 0], [25, 50]])
+        return params

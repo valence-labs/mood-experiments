@@ -23,12 +23,11 @@ class CORAL(BaseModel):
         base_network: nn.Module,
         prediction_head: nn.Module,
         loss_fn: nn.Module,
+        batch_size: int,
         penalty_weight: float,
         penalty_weight_schedule: List[int],
         lr: float = 1e-4,
         weight_decay: float = 0,
-        optimizer="Adam",
-        lr_scheduler="ReduceLROnPlateau",
     ):
         """
         Args:
@@ -43,21 +42,20 @@ class CORAL(BaseModel):
                 Linearly interpolates between the two.
         """
 
-        super().__init__(optimizer, lr, lr_scheduler, weight_decay)
-        self.base_network = base_network
-        self.prediction_head = prediction_head
+        super().__init__(
+            lr=lr,
+            weight_decay=weight_decay,
+            base_network=base_network,
+            prediction_head=prediction_head,
+            loss_fn=loss_fn,
+            batch_size=batch_size,
+        )
+
         self.penalty_weight = penalty_weight
         if len(penalty_weight_schedule) != 2:
             raise ValueError("The penalty weight schedule needs to define two values; The start and end step")
         self.start = penalty_weight_schedule[0]
         self.duration = penalty_weight_schedule[1] - penalty_weight_schedule[0]
-        self._loss_fn = partial(self.loss_function_wrapper, loss_fn=loss_fn)
-
-    def forward(self, x, domains: Optional = None, return_embedding: bool = False):
-        embedding = self.base_network(x)
-        label = self.prediction_head(embedding)
-        out = (label, embedding) if return_embedding else label
-        return out
 
     def _step(self, batch, batch_idx=0, optimizer_idx=None):
         if self.training:
@@ -78,7 +76,7 @@ class CORAL(BaseModel):
 
     def _loss(self, y_pred, y_true, phis_src: Optional = None, phis_tgt: Optional = None):
 
-        erm_loss = self._loss_fn(y_pred, y_true)
+        erm_loss = self.loss_fn(y_pred, y_true)
 
         if not self.training:
             return erm_loss
@@ -105,3 +103,10 @@ class CORAL(BaseModel):
         mean_diff = (mean_x - mean_y).pow(2).mean()
         cova_diff = (cova_x - cova_y).pow(2).mean()
         return mean_diff + cova_diff
+
+    @staticmethod
+    def suggest_params(trial):
+        params = BaseModel.suggest_params(trial)
+        params["penalty_weight"] = trial.suggest_float("penalty_weight", 0.0001, 100, log=True)
+        params["penalty_weight_schedule"] = trial.suggest_categorical("penalty_weight_schedule", [[0, 25], [0, 50], [0, 0], [25, 50]])
+        return params
