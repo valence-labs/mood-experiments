@@ -30,13 +30,15 @@ def get_experimental_configurations(dataset):
     mood_baselines.pop(mood_baselines.index("MLP"))
     mood_algorithms = mood_baselines + list(MOOD_ALGORITHMS.keys())
 
-    all_options = list(itertools.product(
-        mood_algorithms,
-        MOOD_REPRESENTATIONS,
-        MOOD_SPLITTERS,
-        mood_criteria,
-        list(range(NUM_SEEDS)),
-    ))
+    all_options = list(
+        itertools.product(
+            mood_algorithms,
+            MOOD_REPRESENTATIONS,
+            MOOD_SPLITTERS,
+            mood_criteria,
+            list(range(NUM_SEEDS)),
+        )
+    )
     rng = np.random.default_rng(RCT_SEED)
     rng.shuffle(all_options)
     return all_options

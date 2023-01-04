@@ -29,6 +29,7 @@ from mood.rct import get_experimental_configurations
 
 
 def run_study(metric, algorithm, n_startup_trials, n_trials, trial_fn, seed):
+    """Endpoint for running an Optuna study"""
 
     direction = "maximize" if metric.mode == "max" else "minimize"
     sampler = optuna.samplers.TPESampler(seed=seed, n_startup_trials=n_startup_trials)
@@ -83,6 +84,7 @@ def basic_tuning_loop(
             random_state,
             for_uncertainty_estimation,
             ensemble_size,
+            calibrate=True,
         )
         y_pred = model.predict(X_test)
         score = metric(y_test, y_pred)
@@ -99,15 +101,11 @@ def basic_tuning_loop(
     return study
 
 
-def rct_dataset_setup(dataset, train_indices, val_indices, random_state, is_regression):
+def rct_dataset_setup(dataset, train_indices, val_indices, is_regression):
+    """Sets up the dataset. Specifically, splits the dataset and standardizes the targets for regression tasks"""
 
     train_dataset = dataset.filter_by_indices(train_indices)
     val_dataset = dataset.filter_by_indices(val_indices)
-    train_dataset.compute_domains(random_state)
-
-    # NOTE: We need the domains of the validation dataset, since one of the criteria uses these.
-    #  Other than that, these domains are not used.
-    val_dataset.compute_domains(random_state)
 
     scaler = None
 
@@ -123,6 +121,7 @@ def rct_dataset_setup(dataset, train_indices, val_indices, random_state, is_regr
 
 
 def rct_predict_step(model, dataset):
+    """Get the predictions and uncertainty estimates from either a scikit-learn model or torch model"""
     if isinstance(model, BaseEstimator):
         y_pred = model.predict(dataset.X).reshape(-1, 1)
         uncertainty = predict_baseline_uncertainty(model, dataset.X)
@@ -136,6 +135,7 @@ def rct_predict_step(model, dataset):
 
 
 def rct_evaluate_step(performance_metric, calibration_metric, predictions, uncertainties, targets):
+    """Evaluates the performance and calibration of a model"""
     prf_score = performance_metric(targets, predictions, uncertainties)
     cal_score = calibration_metric(targets, predictions, uncertainties)
     return prf_score, cal_score
@@ -164,12 +164,7 @@ def rct_tuning_loop(
 
         random_state = global_seed + trial.number
 
-        splitters = get_mood_splitters(
-            train_val_dataset.smiles,
-            num_repeated_splits,
-            random_state,
-            n_jobs=-1
-        )
+        splitters = get_mood_splitters(train_val_dataset.smiles, num_repeated_splits, random_state, n_jobs=-1)
         train_val_splitter = splitters[train_val_split]
 
         for split_idx, (train_ind, val_ind) in enumerate(train_val_splitter.split(train_val_dataset.X)):
@@ -191,16 +186,25 @@ def rct_tuning_loop(
                 is_regression=is_regression,
                 params=params,
                 seed=random_state,
+                calibrate=False,
             )
 
             val_y_pred, val_uncertainty = rct_predict_step(model, val_dataset)
             val_prf_score, val_cal_score = rct_evaluate_step(
-                performance_metric, calibration_metric, val_y_pred, val_uncertainty, val_dataset.y,
+                performance_metric,
+                calibration_metric,
+                val_y_pred,
+                val_uncertainty,
+                val_dataset.y,
             )
 
             test_y_pred, test_uncertainty = rct_predict_step(model, test_dataset)
             test_prf_score, test_cal_score = rct_evaluate_step(
-                performance_metric, calibration_metric, test_y_pred, test_uncertainty, test_dataset.y,
+                performance_metric,
+                calibration_metric,
+                test_y_pred,
+                test_uncertainty,
+                test_dataset.y,
             )
 
             trial.set_user_attr(f"val_performance_{split_idx}", val_prf_score)
@@ -227,15 +231,15 @@ def rct_tuning_loop(
 
 
 def tune_cmd(
-        dataset,
-        algorithm,
-        representation,
-        train_val_split,
-        criterion,
-        seed: int = 0,
-        use_cache: bool = False,
-        base_save_dir: str = RESULTS_DIR,
-        sub_save_dir: Optional[str] = None,
+    dataset,
+    algorithm,
+    representation,
+    train_val_split,
+    criterion,
+    seed: int = 0,
+    use_cache: bool = False,
+    base_save_dir: str = RESULTS_DIR,
+    sub_save_dir: Optional[str] = None,
 ):
     """
     The MOOD tuning loop: Runs a hyper-parameter search.
@@ -265,17 +269,15 @@ def tune_cmd(
 
     distance_metric = get_distance_metric(X)
     splitters = get_mood_splitters(smiles, 5, seed, n_jobs=-1)
-    train_test_splitter = MOODSplitter(splitters, np.concatenate((distances_vs, distances_op)), distance_metric, k=5)
+    train_test_splitter = MOODSplitter(
+        splitters, np.concatenate((distances_vs, distances_op)), distance_metric, k=5
+    )
     train_test_splitter.fit(X)
 
     # Split the data using the prescribed split
     trainval, test = next(train_test_splitter.split(X, y))
     train_val_dataset = SimpleMolecularDataset(smiles[trainval], X[trainval], y[trainval])
     test_dataset = SimpleMolecularDataset(smiles[test], X[test], y[test])
-
-    # NOTE: We need the domains of the test domains, since MTL uses these for inference as well
-    #  Other than that, these domains are not used.
-    test_dataset.compute_domains(seed)
 
     # Run the hyper-parameter search
     study = rct_tuning_loop(
@@ -309,14 +311,20 @@ def tune_cmd(
     dm.fs.mkdir(csv_out_dir, exist_ok=True)
 
     yaml_path = dm.fs.join(
-        yaml_out_dir, f"rct_selected_model_{algorithm}_{representation}_{train_val_split}_{criterion}_{seed}.yaml"
+        yaml_out_dir,
+        f"rct_selected_model_{algorithm}_{representation}_{train_val_split}_{criterion}_{seed}.yaml",
     )
     logger.info(f"Saving the data of the best model to {yaml_path}")
     with fsspec.open(yaml_path, "w") as fd:
         yaml.dump(data, fd)
 
 
-def rct_cmd(dataset: str, index: int, base_save_dir: str = RESULTS_DIR, sub_save_dir: Optional[str] = None,):
+def rct_cmd(
+    dataset: str,
+    index: int,
+    base_save_dir: str = RESULTS_DIR,
+    sub_save_dir: Optional[str] = None,
+):
     """
     Entrypoint for the benchmarking study in the MOOD Investigation.
 

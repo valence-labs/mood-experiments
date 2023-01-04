@@ -11,10 +11,15 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.base import ClassifierMixin, clone
 
 
+"""
+These are the three baselines we consider in the MOOD study
+For benchmarking, we use a torch MLP rather than the one from scikit-learn.
+"""
 MOOD_BASELINES = ["MLP", "RF", "GP"]
 
 
 def get_baseline_cls(name, is_regression):
+    """Simple method that allows a model to be identified by its name"""
 
     target_type = "regression" if is_regression else "classification"
     data = {
@@ -41,14 +46,19 @@ def get_baseline_model(
     params: dict,
     for_uncertainty_estimation: bool = False,
     ensemble_size: int = 10,
+    calibrate: bool = True,
 ):
+    """Entrypoint for constructing a baseline model from scikit-learn"""
     model = get_baseline_cls(name, is_regression)(**params)
     if for_uncertainty_estimation:
-        model = uncertainty_wrapper(model, ensemble_size)
+        model = uncertainty_wrapper(model, ensemble_size, calibrate)
     return model
 
 
-def uncertainty_wrapper(model, ensemble_size: int = 10):
+def uncertainty_wrapper(model, ensemble_size: int = 10, calibrate: bool = True):
+    """Wraps the model so that it can be used for uncertainty estimation.
+    This includes at most two steps: Turning MLPs in an ensemble and calibrating RF and MLP classifiers
+    """
     if isinstance(model, MLPClassifier) or isinstance(model, MLPRegressor):
         models = []
         for idx in range(ensemble_size):
@@ -61,13 +71,18 @@ def uncertainty_wrapper(model, ensemble_size: int = 10):
         else:
             model = VotingRegressor(models, n_jobs=-1)
 
-    if isinstance(model, RandomForestClassifier) or isinstance(model, MLPClassifier):
+    if calibrate and isinstance(model, RandomForestClassifier) or isinstance(model, MLPClassifier):
         model = CalibratedClassifierCV(model)
     return model
 
 
 def predict_baseline_uncertainty(model, X):
+    """Predicts the uncertainty of the model.
 
+    For GP regressors, we use the included uncertainty estimation.
+    For classifiers, the entropy of the prediction is used as uncertainty.
+    For regressors, the variance of the prediction is used as uncertainty.
+    """
     if isinstance(model, ClassifierMixin):
         proba = model.predict_proba(X)[:, 1]
         x_0 = np.clip(proba, 1e-10, 1.0 - 1e-10)
@@ -87,7 +102,7 @@ def predict_baseline_uncertainty(model, X):
 
 
 def suggest_mlp_hparams(trial, is_regression):
-
+    """Sample the hyper-parameter search space for MLPs"""
     architectures = [[width] * depth for width in [64, 128, 256] for depth in range(1, 4)]
     arch = trial.suggest_categorical("hidden_layer_sizes", architectures)
     lr = trial.suggest_float("learning_rate_init", 1e-7, 1e0, log=True)
@@ -103,7 +118,7 @@ def suggest_mlp_hparams(trial, is_regression):
 
 
 def suggest_rf_hparams(trial, is_regression):
-
+    """Sample the hyper-parameter search space for RFs"""
     n_estimators = trial.suggest_int("n_estimators", 100, 1000)
     max_depth = trial.suggest_categorical("max_depth", [None] + list(range(1, 11)))
 
@@ -115,6 +130,7 @@ def suggest_rf_hparams(trial, is_regression):
 
 
 def construct_kernel(is_regression, params):
+    """Constructs a scikit-learn kernel based on provided hyper-parameters"""
 
     metric = params.pop("kernel_metric")
     gamma = params.pop("kernel_gamma")
@@ -136,6 +152,7 @@ def construct_kernel(is_regression, params):
 
 
 def suggest_gp_hparams(trial, is_regression):
+    """Sample the hyper-parameter search space for GPs"""
 
     kernel_types = ["linear", "poly", "polynomial", "rbf", "laplacian", "sigmoid", "cosine"]
     metric = trial.suggest_categorical("kernel_metric", kernel_types)
@@ -158,6 +175,7 @@ def suggest_gp_hparams(trial, is_regression):
 
 
 def suggest_baseline_hparams(name: str, is_regression: bool, trial: optuna.Trial):
+    """Endpoint for sampling the hyper-parameter search space of the baselines"""
     fs = {
         "MLP": suggest_mlp_hparams,
         "RF": suggest_rf_hparams,

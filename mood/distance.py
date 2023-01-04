@@ -6,7 +6,7 @@ from sklearn.neighbors import NearestNeighbors
 
 
 def get_distance_metric(example):
-    """Get the appropiate distance metric given an exemplary datapoint"""
+    """Get the appropriate distance metric given an exemplary datapoint"""
 
     # By default we use the Euclidean distance
     metric = "euclidean"

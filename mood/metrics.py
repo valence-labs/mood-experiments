@@ -135,12 +135,21 @@ class Metric:
         if name == "MAE":
             return cls("MAE", weighted_mae, "min", TargetType.REGRESSION, True, False, 0, None)
         elif name == "Spearman":
-            return cls("Spearman", weighted_spearman_calibration, "max", TargetType.REGRESSION, True, True, -1, 1)
+            return cls(
+                "Spearman", weighted_spearman_calibration, "max", TargetType.REGRESSION, True, True, -1, 1
+            )
         elif name == "AUROC":
             return cls("AUROC", weighted_auroc, "max", TargetType.BINARY_CLASSIFICATION, True, False, 0, 1)
         elif name == "Brier score":
             return cls(
-                "Brier score", weighted_brier_score, "min", TargetType.BINARY_CLASSIFICATION, False, True, 0, 1
+                "Brier score",
+                weighted_brier_score,
+                "min",
+                TargetType.BINARY_CLASSIFICATION,
+                False,
+                True,
+                0,
+                1,
             )
 
     def __call__(

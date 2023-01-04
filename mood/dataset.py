@@ -6,23 +6,27 @@ import numpy as np
 from typing import Optional, List
 
 import torch.utils.data
-from sklearn.cluster import MiniBatchKMeans
 from tdc.single_pred import ADME, Tox
 from tdc.metadata import dataset_names
 from torch.utils.data import default_collate
+
+from mood.chemistry import compute_murcko_scaffold
 from mood.constants import CACHE_DIR
-from mood.distance import get_distance_metric
-from mood.transformer import EmpiricalKernelMapTransformer
 
 
 class SimpleMolecularDataset(torch.utils.data.Dataset):
+    """
+    Simple wrapper to use these datasets with PyTorch (Lightning)
+    Special is that this includes the notion of a molecular domain,
+    needed for Domain Generalization
+    """
 
     def __init__(self, smiles, X, y):
         self.smiles = smiles
         self.X = X
         self.y = y
         self.random_state = None
-        self.domains = None
+        self.domains = np.array([compute_murcko_scaffold(smi) for smi in self.smiles])
 
     def __getitem__(self, index):
         x = self.X[index]
@@ -33,41 +37,19 @@ class SimpleMolecularDataset(torch.utils.data.Dataset):
     def __len__(self):
         return len(self.X)
 
-    def compute_domains(self, random_state):
-
-        self.random_state = random_state
-
-        if self.domains is not None:
-            raise RuntimeError("Don't call compute_domains() twice")
-
-        metric = get_distance_metric(self.X)
-
-        X = np.copy(self.X)
-        if metric != "euclidean":
-            transformer = EmpiricalKernelMapTransformer(
-                n_samples=min(512, len(X)),
-                metric=metric,
-                random_state=self.random_state,
-            )
-            X = transformer(X)
-
-        model = MiniBatchKMeans(8, random_state=self.random_state, compute_labels=True)
-        model.fit(X)
-
-        indices = model.labels_
-        self.domains = model.cluster_centers_[indices]
-
     def filter_by_indices(self, indices):
         cpy = deepcopy(self)
         cpy.smiles = cpy.smiles[indices]
         cpy.X = cpy.X[indices]
         cpy.y = cpy.y[indices]
         if cpy.domains is not None:
-            cpy.domains = cpy.compute_domains(cpy.random_state)
+            cpy.domains = cpy.domains[indices]
         return cpy
 
 
 class DAMolecularDataset(torch.utils.data.Dataset):
+    """Simple wrapper that creates a dataset with a supervised source domain and unsupervised target domain.
+    This is needed for Domain Adaptation algorithms."""
 
     def __init__(self, source_dataset: SimpleMolecularDataset, target_dataset: SimpleMolecularDataset):
         self.src = source_dataset
@@ -84,6 +66,8 @@ class DAMolecularDataset(torch.utils.data.Dataset):
 
 
 def domain_based_collate(batch):
+    """Custom collate function that splits a single batch into several mini-batches based on the domain.
+    Doing that here instead of on the GPU is faster."""
     domains = [domain for (X, domain), y in batch]
     _, inverse = np.unique(domains, return_inverse=True, axis=0)
 
@@ -96,6 +80,9 @@ def domain_based_collate(batch):
 
 
 def load_data_from_tdc(name: str, disable_logs: bool = False):
+    """
+    Endpoint from loading a dataset from TDC
+    """
 
     original_name = name
     if name in MOOD_TO_TDC:
@@ -133,6 +120,7 @@ def dataset_iterator(
     whitelist: Optional[List[str]] = None,
     blacklist: Optional[List[str]] = None,
 ):
+    """Endpoint for iterating over several datasets from TDC"""
 
     if whitelist is not None and blacklist is not None:
         msg = "You cannot use a blacklist and whitelist at the same time"

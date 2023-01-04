@@ -10,15 +10,14 @@ from pytorch_lightning import LightningModule
 
 
 class BaseModel(LightningModule, abc.ABC):
-
     def __init__(
-            self,
-            base_network: nn.Module,
-            prediction_head: nn.Module,
-            loss_fn: nn.Module,
-            lr: float,
-            weight_decay: Union[float, str],
-            batch_size: int,
+        self,
+        base_network: nn.Module,
+        prediction_head: nn.Module,
+        loss_fn: nn.Module,
+        lr: float,
+        weight_decay: Union[float, str],
+        batch_size: int,
     ):
         super().__init__()
         self.base_network = base_network
@@ -34,7 +33,9 @@ class BaseModel(LightningModule, abc.ABC):
         out = (label, embedding) if return_embedding else label
         return out
 
-    def training_step(self, batch, batch_idx, optimizer_idx: Optional[int] = None, dataset_idx: Optional[int] = None):
+    def training_step(
+        self, batch, batch_idx, optimizer_idx: Optional[int] = None, dataset_idx: Optional[int] = None
+    ):
         return self._step(batch, batch_idx, optimizer_idx)
 
     def validation_step(self, batch, batch_idx, dataset_idx: Optional[int] = None):
@@ -72,7 +73,7 @@ class BaseModel(LightningModule, abc.ABC):
                 "frequency": 1,
                 "monitor": "val_loss",
                 "strict": True,
-            }
+            },
         }
 
     def log(self, name: str, *args, **kwargs):
@@ -85,8 +86,7 @@ class BaseModel(LightningModule, abc.ABC):
         depth = trial.suggest_int("mlp_depth", 1, 5)
         lr = trial.suggest_float("lr", 1e-8, 1.0, log=True)
         weight_decay = trial.suggest_categorical(
-            "weight_decay",
-            ["auto", 0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0]
+            "weight_decay", ["auto", 0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0]
         )
         return {"mlp_width": width, "mlp_depth": depth, "lr": lr, "weight_decay": weight_decay}
 

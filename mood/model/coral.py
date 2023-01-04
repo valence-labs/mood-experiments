@@ -108,5 +108,7 @@ class CORAL(BaseModel):
     def suggest_params(trial):
         params = BaseModel.suggest_params(trial)
         params["penalty_weight"] = trial.suggest_float("penalty_weight", 0.0001, 100, log=True)
-        params["penalty_weight_schedule"] = trial.suggest_categorical("penalty_weight_schedule", [[0, 25], [0, 50], [0, 0], [25, 50]])
+        params["penalty_weight_schedule"] = trial.suggest_categorical(
+            "penalty_weight_schedule", [[0, 25], [0, 50], [0, 0], [25, 50]]
+        )
         return params

@@ -191,7 +191,11 @@ class DANN(BaseModel):
         params["penalty_weight"] = trial.suggest_float(1e-10, 1.0, log=True)
         params["penalty_weight_schedule"] = trial.suggest_float(1e-10, 1.0, log=True)
         params["discr_lr"] = trial.suggest_float("discr_lr", 1e-8, 1.0, log=True)
-        params["discr_weight_decay"] = trial.suggest_categorical("discr_weight_decay", ["auto", 0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0])
+        params["discr_weight_decay"] = trial.suggest_categorical(
+            "discr_weight_decay", ["auto", 0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0]
+        )
         params["lambda_reg"] = trial.suggest_float("lambda_reg", 0.001, 10, log=True)
-        params["n_discr_steps_per_predictor_step"] = trial.suggest_int("n_discr_steps_per_predictor_step", 1, 5)
+        params["n_discr_steps_per_predictor_step"] = trial.suggest_int(
+            "n_discr_steps_per_predictor_step", 1, 5
+        )
         return params

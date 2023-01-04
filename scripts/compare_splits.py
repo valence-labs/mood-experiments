@@ -38,7 +38,7 @@ def cli(
 
     fig_out_dir = dm.fs.join(base_save_dir, "figures", "compare_splits", sub_save_dir)
     dm.fs.mkdir(fig_out_dir, exist_ok=True)
-    
+
     data_out_dir = dm.fs.join(base_save_dir, "numpy", "compare_splits", sub_save_dir)
     dm.fs.mkdir(data_out_dir, exist_ok=True)
 
@@ -82,7 +82,7 @@ def cli(
                     )
                 logger.info(f"Saving figure to {out_path}")
                 save_figure_with_fsspec(out_path, exist_ok=overwrite)
-            
+
             for char in splitter._split_chars:
                 out_path = dm.fs.join(data_out_dir, f"distances_{dataset}_{representation}_{char.label}.npy")
                 if not overwrite and dm.fs.exists(out_path):
@@ -92,7 +92,7 @@ def cli(
                 logger.info(f"Saving distance data to {out_path}")
                 with fsspec.open(out_path, "wb") as fd:
                     np.save(fd, char.distances)
-            
+
             df_ = splitter.get_protocol_results()
             df_["representation"] = representation
             df_["dataset"] = dataset

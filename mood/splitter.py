@@ -31,9 +31,7 @@ def get_mood_splitters(smiles, n_splits: int = 5, random_state: int = 0, n_jobs:
 
     scaffolds = [dm.to_smiles(dm.to_scaffold_murcko(dm.to_mol(smi))) for smi in smiles]
     splitters = {
-        "Random": ShuffleSplit(
-            n_splits=n_splits, random_state=random_state
-        ),
+        "Random": ShuffleSplit(n_splits=n_splits, random_state=random_state),
         "Scaffold": PredefinedGroupShuffleSplit(
             groups=scaffolds, n_splits=n_splits, random_state=random_state
         ),
@@ -108,8 +106,14 @@ class MOODSplitter(BaseShuffleSplit):
     downstream applications.
     """
 
-    def __init__(self, splitters: Dict[str, BaseShuffleSplit], downstream_distances: Optional[np.ndarray] = None,
-                 metric: Union[str, Callable] = "minkowski", p: int = 2, k: int = 5):
+    def __init__(
+        self,
+        splitters: Dict[str, BaseShuffleSplit],
+        downstream_distances: Optional[np.ndarray] = None,
+        metric: Union[str, Callable] = "minkowski",
+        p: int = 2,
+        k: int = 5,
+    ):
         """
         Args:
             splitters: A list of splitter methods you are considering
@@ -153,23 +157,23 @@ class MOODSplitter(BaseShuffleSplit):
 
         sns.kdeplot(downstream_distances, color=cmap[0], linestyle="--", alpha=0.3, ax=ax)
         return ax
-    
+
     @staticmethod
     def score_representativeness(downstream_distances, distances, num_samples: int = 100):
         """Scores a representativeness score between two distributions
         A higher score should be interpreted as _more_ representative"""
         pdf_split = gaussian_kde(distances)
         pdf_downstream = gaussian_kde(downstream_distances)
-        
+
         vmin = np.min(np.concatenate((downstream_distances, distances)))
         vmax = np.max(np.concatenate((downstream_distances, distances)))
         positions = np.linspace(vmin, vmax, num=num_samples)
-        
-        samples_split = pdf_split(positions)        
+
+        samples_split = pdf_split(positions)
         samples_downstream = pdf_downstream(positions)
-        
+
         return 1.0 - jensenshannon(samples_downstream, samples_split, base=2)
-    
+
     @property
     def prescribed_splitter_label(self):
         if not self.fitted:
@@ -248,8 +252,10 @@ class MOODSplitter(BaseShuffleSplit):
 
         self._split_chars = split_chars
         self._prescribed_splitter_label = chosen.label
-        
-        logger.info(f"Ranked all different splitting methods:\n{SplitCharacterization.as_dataframe(split_chars)}")
+
+        logger.info(
+            f"Ranked all different splitting methods:\n{SplitCharacterization.as_dataframe(split_chars)}"
+        )
         logger.info(f"Selected {chosen.label} as the most representative splitting method")
 
         if plot:
@@ -300,10 +306,10 @@ class KMeansSplit(GroupShuffleSplit):
 
     def compute_kmeans_clustering(self, X, random_state_offset: int = 0, return_centers: bool = False):
         metric = get_distance_metric(X)
-        
-        if self.random_state is not None: 
+
+        if self.random_state is not None:
             seed = self.random_state + random_state_offset
-        else: 
+        else:
             seed = None
 
         if metric != "euclidean":
@@ -379,8 +385,8 @@ class PerimeterSplit(KMeansSplit):
                 centers, return_inverse=True, return_counts=True, axis=0
             )
             groups_set = np.unique(group_indices)
-            
-            # We always use the euclidean metric. For binary vectors we would have 
+
+            # We always use the euclidean metric. For binary vectors we would have
             # used the jaccard metric normally, but because of the k-Means clustering this
             # data would be transformed using the Empirical Kernel Map.
             distance_matrix = pairwise_distances(centers, metric="euclidean", n_jobs=self._n_jobs)
@@ -416,8 +422,8 @@ class PerimeterSplit(KMeansSplit):
                 train_indices.extend(list(np.flatnonzero(group_indices == groups_set[i])))
 
             yield np.array(train_indices), np.array(test_indices)
-            
-            
+
+
 class MaxDissimilaritySplit(KMeansSplit):
     """Splits the data such that the train and test set are maximally dissimilar."""
 
@@ -446,7 +452,7 @@ class MaxDissimilaritySplit(KMeansSplit):
 
         if groups is not None:
             logger.warning("Ignoring the groups parameter in favor of the predefined groups")
-           
+
         metric = get_distance_metric(X)
 
         n_samples = _num_samples(X)
@@ -456,9 +462,9 @@ class MaxDissimilaritySplit(KMeansSplit):
             self.train_size,
             default_test_size=self._default_test_size,
         )
-        
+
         for i in range(self.n_splits):
-            
+
             # We introduce some stochasticity through the k-Means clustering
             groups, centers = self.compute_kmeans_clustering(X, random_state_offset=i, return_centers=True)
             centers, group_indices, group_counts = np.unique(
@@ -466,23 +472,23 @@ class MaxDissimilaritySplit(KMeansSplit):
             )
             groups_set = np.unique(group_indices)
 
-            # We always use the euclidean metric. For binary vectors we would have 
+            # We always use the euclidean metric. For binary vectors we would have
             # used the jaccard metric normally, but because of the k-Means clustering this
             # data would be transformed using the Empirical Kernel Map.
             distance_matrix = pairwise_distances(centers, metric="euclidean", n_jobs=self._n_jobs)
 
-            # The initial test cluster is the one with the 
+            # The initial test cluster is the one with the
             # highest mean distance to all other clusters
             test_idx = np.argmax(distance_matrix.mean(axis=0))
-            
-            # The initial train cluster is the one furthest from 
+
+            # The initial train cluster is the one furthest from
             # the initial test cluster
             train_idx = np.argmax(distance_matrix[test_idx])
 
             train_indices = np.flatnonzero(group_indices == groups_set[train_idx])
             test_indices = np.flatnonzero(group_indices == groups_set[test_idx])
-            
-            # Iteratively add the train cluster that is furthest 
+
+            # Iteratively add the train cluster that is furthest
             # from the _initial_ test cluster.
             sorted_groups = np.argsort(distance_matrix[train_idx])
             for group_idx in sorted_groups:

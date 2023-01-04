@@ -19,7 +19,7 @@ MOOD_ALGORITHMS = {
     "IB-ERM": InformationBottleneckERM,
     "Mixup": Mixup,
     "MLP": ERM,
-    "MTL": MTL
+    "MTL": MTL,
 }
 
 

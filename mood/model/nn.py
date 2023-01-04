@@ -181,11 +181,11 @@ class MLP(nn.Module):
 
 
 def get_simple_mlp(
-        input_size: int,
-        width: int = 0,
-        depth: int = 0,
-        out_size: Optional[int] = 1,
-        is_regression: Optional[bool] = None,
+    input_size: int,
+    width: int = 0,
+    depth: int = 0,
+    out_size: Optional[int] = 1,
+    is_regression: Optional[bool] = None,
 ):
     if out_size is not None and not isinstance(is_regression, bool):
         raise TypeError("Specify is_regression to be True or False")

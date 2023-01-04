@@ -28,6 +28,7 @@ def train_baseline_model(
     seed: Optional[int] = None,
     for_uncertainty_estimation: bool = False,
     ensemble_size: int = 10,
+    calibrate: bool = False,
 ):
     if params is None:
         params = {}
@@ -39,7 +40,14 @@ def train_baseline_model(
     if algorithm == "GP":
         params["kernel"], params = construct_kernel(is_regression, params)
 
-    model = get_baseline_model(algorithm, is_regression, params, for_uncertainty_estimation, ensemble_size)
+    model = get_baseline_model(
+        name=algorithm,
+        is_regression=is_regression,
+        params=params,
+        for_uncertainty_estimation=for_uncertainty_estimation,
+        ensemble_size=ensemble_size,
+        calibrate=calibrate,
+    )
     model.fit(X, y)
 
     return model
@@ -72,7 +80,7 @@ def train_torch_model(
             prediction_head=head,
             loss_fn=torch.nn.MSELoss() if is_regression else torch.nn.BCELoss(),
             batch_size=BATCH_SIZE,
-            **params
+            **params,
         )
 
         if is_domain_adaptation(model):
@@ -80,7 +88,9 @@ def train_torch_model(
             train_dataloader = DataLoader(train_dataset_da, batch_size=BATCH_SIZE, shuffle=True)
             val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
         elif is_domain_generalization(model):
-            train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=domain_based_collate)
+            train_dataloader = DataLoader(
+                train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=domain_based_collate
+            )
             val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, collate_fn=domain_based_collate)
         else:
             train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
@@ -104,18 +114,23 @@ def train_torch_model(
 
 
 def train(
-        train_dataset: SimpleMolecularDataset,
-        val_dataset: SimpleMolecularDataset,
-        test_dataset: SimpleMolecularDataset,
-        algorithm: str,
-        is_regression: bool,
-        params: dict,
-        seed: int,
+    train_dataset: SimpleMolecularDataset,
+    val_dataset: SimpleMolecularDataset,
+    test_dataset: SimpleMolecularDataset,
+    algorithm: str,
+    is_regression: bool,
+    params: dict,
+    seed: int,
+    calibrate: bool = False,
 ):
     # NOTE: The order here matters since there are two MLP implementations
     #  In this case, we want to use the torch implementation.
 
     if algorithm in MOOD_ALGORITHMS:
+
+        if calibrate:
+            raise NotImplementedError("We only support calibration for scikit-learn models")
+
         return train_torch_model(
             train_dataset=train_dataset,
             val_dataset=val_dataset,
@@ -136,9 +151,9 @@ def train(
             params=params,
             seed=seed,
             for_uncertainty_estimation=True,
-            ensemble_size=5
+            ensemble_size=5,
+            calibrate=calibrate,
         )
 
     else:
         raise NotImplementedError(f"{algorithm} is not supported")
-
