@@ -101,7 +101,7 @@ def basic_tuning_loop(
     return study
 
 
-def rct_dataset_setup(dataset, train_indices, val_indices, is_regression):
+def rct_dataset_setup(dataset, train_indices, val_indices, test_dataset, is_regression):
     """Sets up the dataset. Specifically, splits the dataset and standardizes the targets for regression tasks"""
 
     train_dataset = dataset.filter_by_indices(train_indices)
@@ -114,6 +114,7 @@ def rct_dataset_setup(dataset, train_indices, val_indices, is_regression):
         scaler = StandardScaler()
         train_dataset.y = scaler.fit_transform(train_dataset.y)
         val_dataset.y = scaler.transform(val_dataset.y)
+        test_dataset.y = scaler.transform(test_dataset.y)
 
     return train_dataset, val_dataset, scaler
 
@@ -171,9 +172,8 @@ def rct_tuning_loop(
         for split_idx, (train_ind, val_ind) in enumerate(train_val_splitter.split(train_val_dataset.X)):
 
             train_dataset, val_dataset, scaler = rct_dataset_setup(
-                train_val_dataset, train_ind, val_ind, is_regression
+                train_val_dataset, train_ind, val_ind, test_dataset, is_regression
             )
-            test_dataset.y = scaler.transform(test_dataset.y)
 
             if algorithm in MOOD_ALGORITHMS:
                 params = MOOD_ALGORITHMS[algorithm].suggest_params(trial)
