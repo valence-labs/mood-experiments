@@ -188,8 +188,8 @@ class DANN(BaseModel):
     @staticmethod
     def suggest_params(trial):
         params = BaseModel.suggest_params(trial)
-        params["penalty_weight"] = trial.suggest_float(1e-10, 1.0, log=True)
-        params["penalty_weight_schedule"] = trial.suggest_float(1e-10, 1.0, log=True)
+        params["penalty_weight"] = trial.suggest_float("penalty_weight", 1e-10, 1.0, log=True)
+        params["penalty_weight_schedule"] = trial.suggest_float("penalty_weight_schedule", 1e-10, 1.0, log=True)
         params["discr_lr"] = trial.suggest_float("discr_lr", 1e-8, 1.0, log=True)
         params["discr_weight_decay"] = trial.suggest_categorical(
             "discr_weight_decay", ["auto", 0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0]
