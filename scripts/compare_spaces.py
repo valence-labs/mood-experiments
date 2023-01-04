@@ -20,7 +20,7 @@ from mood.preprocessing import DEFAULT_PREPROCESSING
 from mood.distance import compute_knn_distance
 from mood.visualize import plot_distance_distributions
 from mood.representations import representation_iterator, featurize
-from mood.constants import DOWNSTREAM_RESULTS_DIR
+from mood.constants import RESULTS_DIR
 from mood.utils import (
     load_representation_for_downstream_application,
     save_figure_with_fsspec,
@@ -90,7 +90,7 @@ def compute_correlations(input_spaces, model_spaces, labels):
 
 
 def cli(
-    base_save_dir: str = DOWNSTREAM_RESULTS_DIR,
+    base_save_dir: str = RESULTS_DIR,
     sub_save_dir: Optional[str] = None,
     overwrite: bool = False,
     skip_representation: Optional[List[str]] = None,

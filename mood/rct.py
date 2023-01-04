@@ -25,7 +25,10 @@ def get_experimental_configurations(dataset):
     cal_metric = Metric.get_default_calibration_metric(dataset)
 
     mood_criteria = get_mood_criteria(prf_metric, cal_metric).keys()
-    mood_algorithms = MOOD_BASELINES.pop(MOOD_BASELINES.index("MLP")) + MOOD_ALGORITHMS
+
+    mood_baselines = MOOD_BASELINES
+    mood_baselines.pop(mood_baselines.index("MLP"))
+    mood_algorithms = mood_baselines + list(MOOD_ALGORITHMS.keys())
 
     all_options = list(itertools.product(
         mood_algorithms,

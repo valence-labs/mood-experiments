@@ -43,7 +43,7 @@ class BaseModel(LightningModule, abc.ABC):
     def predict(self, dataloader):
         self.training = False
         with torch.inference_mode():
-            res = torch.cat([self.forward(x, domains) for (x, domains), y in dataloader], dim=0)
+            res = torch.cat([self.forward(*X) for X, y in dataloader], dim=0)
         return res
 
     @staticmethod
@@ -81,15 +81,14 @@ class BaseModel(LightningModule, abc.ABC):
 
     @staticmethod
     def suggest_params(trial):
-        width = trial.suggest_categorical("mlp_width", [64, 128, 256])
+        width = trial.suggest_categorical("mlp_width", [64, 128, 256, 512])
         depth = trial.suggest_int("mlp_depth", 1, 5)
         lr = trial.suggest_float("lr", 1e-8, 1.0, log=True)
-        num_epochs = trial.suggest_int("num_epochs", 50, 200)
         weight_decay = trial.suggest_categorical(
             "weight_decay",
             ["auto", 0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0]
         )
-        return {"mlp_width": width, "mlp_depth": depth, "lr": lr, "weight_decay": weight_decay, "num_epochs": num_epochs}
+        return {"mlp_width": width, "mlp_depth": depth, "lr": lr, "weight_decay": weight_decay}
 
 
 class Ensemble(LightningModule):

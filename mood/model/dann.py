@@ -2,7 +2,6 @@ from itertools import chain
 
 import torch
 import torch.nn.functional as F
-from functools import partial
 from typing import Optional, List
 from torch import nn
 

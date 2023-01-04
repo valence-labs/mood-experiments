@@ -11,7 +11,7 @@ from loguru import logger
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-from mood.constants import DOWNSTREAM_RESULTS_DIR
+from mood.constants import RESULTS_DIR
 from mood.dataset import load_data_from_tdc, MOOD_REGR_DATASETS
 from mood.metrics import Metric, compute_bootstrapped_metric
 from mood.representations import featurize
@@ -30,7 +30,7 @@ def cli(
     n_seeds: int = 5,
     n_trials: int = 50,
     n_startup_trials: int = 10,
-    base_save_dir: str = DOWNSTREAM_RESULTS_DIR,
+    base_save_dir: str = RESULTS_DIR,
     sub_save_dir: Optional[str] = None,
     overwrite: bool = False,
 ):

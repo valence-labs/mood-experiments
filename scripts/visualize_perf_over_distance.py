@@ -6,7 +6,7 @@ from typing import Optional
 
 from matplotlib import pyplot as plt
 
-from mood.constants import DOWNSTREAM_RESULTS_DIR
+from mood.constants import RESULTS_DIR
 from mood.visualize import plot_performance_over_distance
 
 
@@ -14,7 +14,7 @@ def cli(
     baseline_algorithm: str,
     representation: str,
     dataset: str,
-    base_save_dir: str = DOWNSTREAM_RESULTS_DIR,
+    base_save_dir: str = RESULTS_DIR,
     sub_save_dir: Optional[str] = None,
 ):
 

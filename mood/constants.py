@@ -15,7 +15,7 @@ DOWNSTREAM_APPS_DATA_DIR = "gs://experiments-output/mood-v2/downstream_applicati
 """
 Where the results of MOOD are saved
 """
-DOWNSTREAM_RESULTS_DIR = "gs://experiments-output/mood-v2/results/"
+RESULTS_DIR = "gs://experiments-output/mood-v2/results/"
 
 """
 The two downstream applications we consider for MOOD as application areas of molecular scoring

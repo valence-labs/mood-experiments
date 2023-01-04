@@ -6,12 +6,13 @@ import numpy as np
 from typing import Optional, List
 
 import torch.utils.data
+from sklearn.cluster import MiniBatchKMeans
 from tdc.single_pred import ADME, Tox
 from tdc.metadata import dataset_names
 from torch.utils.data import default_collate
-
-from mood.chemistry import compute_murcko_scaffold
 from mood.constants import CACHE_DIR
+from mood.distance import get_distance_metric
+from mood.transformer import EmpiricalKernelMapTransformer
 
 
 class SimpleMolecularDataset(torch.utils.data.Dataset):
@@ -20,20 +21,49 @@ class SimpleMolecularDataset(torch.utils.data.Dataset):
         self.smiles = smiles
         self.X = X
         self.y = y
-        self.domains = np.array(dm.utils.parallelized(compute_murcko_scaffold, self.smiles))
+        self.random_state = None
+        self.domains = None
 
     def __getitem__(self, index):
-        return (self.X[index], self.domains[index]), self.y[index]
+        x = self.X[index]
+        if self.domains is not None:
+            x = (x, self.domains[index])
+        return x, self.y[index]
 
     def __len__(self):
         return len(self.X)
+
+    def compute_domains(self, random_state):
+
+        self.random_state = random_state
+
+        if self.domains is not None:
+            raise RuntimeError("Don't call compute_domains() twice")
+
+        metric = get_distance_metric(self.X)
+
+        X = np.copy(self.X)
+        if metric != "euclidean":
+            transformer = EmpiricalKernelMapTransformer(
+                n_samples=min(512, len(X)),
+                metric=metric,
+                random_state=self.random_state,
+            )
+            X = transformer(X)
+
+        model = MiniBatchKMeans(8, random_state=self.random_state, compute_labels=True)
+        model.fit(X)
+
+        indices = model.labels_
+        self.domains = model.cluster_centers_[indices]
 
     def filter_by_indices(self, indices):
         cpy = deepcopy(self)
         cpy.smiles = cpy.smiles[indices]
         cpy.X = cpy.X[indices]
         cpy.y = cpy.y[indices]
-        cpy.domains = cpy.domains[indices]
+        if cpy.domains is not None:
+            cpy.domains = cpy.compute_domains(cpy.random_state)
         return cpy
 
 
@@ -56,9 +86,13 @@ class DAMolecularDataset(torch.utils.data.Dataset):
 def domain_based_collate(batch):
     domains = [domain for (X, domain), y in batch]
     _, inverse = np.unique(domains, return_inverse=True, axis=0)
+
+    mini_batches = []
     for idx in np.unique(inverse):
         indices = np.flatnonzero(inverse == idx)
-        yield default_collate([batch[i] for i in indices])
+        mini_batch = default_collate([batch[i] for i in indices])
+        mini_batches.append(mini_batch)
+    return mini_batches
 
 
 def load_data_from_tdc(name: str, disable_logs: bool = False):

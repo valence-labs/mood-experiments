@@ -12,12 +12,12 @@ from mood.representations import representation_iterator
 from mood.splitter import MOODSplitter, get_mood_splitters
 from mood.preprocessing import DEFAULT_PREPROCESSING
 from mood.utils import load_distances_for_downstream_application, save_figure_with_fsspec
-from mood.constants import DOWNSTREAM_RESULTS_DIR
+from mood.constants import RESULTS_DIR
 from mood.distance import get_distance_metric
 
 
 def cli(
-    base_save_dir: str = DOWNSTREAM_RESULTS_DIR,
+    base_save_dir: str = RESULTS_DIR,
     sub_save_dir: Optional[str] = None,
     skip_representation: Optional[List[str]] = None,
     skip_dataset: Optional[List[str]] = None,

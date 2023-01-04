@@ -3,6 +3,7 @@ from typing import Optional
 
 import torch
 from pytorch_lightning import Trainer
+from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from lightning_lite.utilities.seed import seed_everything
 from torch.utils.data import DataLoader
 
@@ -11,9 +12,11 @@ from mood.dataset import SimpleMolecularDataset, DAMolecularDataset, domain_base
 from mood.model import MOOD_ALGORITHMS, is_domain_generalization, is_domain_adaptation
 from mood.model.base import Ensemble
 from mood.model.nn import get_simple_mlp
+from mood.utils import Timer
 
 
 BATCH_SIZE = 256
+NUM_EPOCHS = 100
 
 
 def train_baseline_model(
@@ -58,10 +61,9 @@ def train_torch_model(
 
     width = params.pop("mlp_width")
     depth = params.pop("mlp_depth")
-    num_epochs = params.pop("num_epochs")
 
     base = get_simple_mlp(len(train_dataset.X[0]), width, depth, out_size=None)
-    head = get_simple_mlp(width, is_regression=is_regression)
+    head = get_simple_mlp(input_size=width, is_regression=is_regression)
 
     models = []
     for i in range(ensemble_size):
@@ -84,11 +86,14 @@ def train_torch_model(
             train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
             val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
 
+        callbacks = [EarlyStopping("val_loss", patience=10, mode="min")]
         trainer = Trainer(
-            max_epochs=num_epochs,
+            max_epochs=NUM_EPOCHS,
             deterministic="warn",
+            callbacks=callbacks,
             enable_model_summary=False,
             enable_progress_bar=False,
+            num_sanity_val_steps=0,
             logger=False,
             enable_checkpointing=False,
         )
@@ -108,6 +113,7 @@ def train(
         seed: int,
 ):
     # NOTE: The order here matters since there are two MLP implementations
+    #  In this case, we want to use the torch implementation.
 
     if algorithm in MOOD_ALGORITHMS:
         return train_torch_model(

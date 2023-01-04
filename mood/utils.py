@@ -1,5 +1,7 @@
 import tempfile
 import uuid
+from datetime import datetime
+from typing import Optional
 
 import datamol as dm
 import pandas as pd
@@ -143,3 +145,29 @@ def get_mask_for_distances_or_representations(X):
         if a is not None and ~np.isnan(a).any() and np.isfinite(a).all() and ~(a > 1e4).any()
     ]
     return mask
+
+
+class Timer:
+    """Context manager for timing operations"""
+
+    def __init__(self, name: Optional[str] = None):
+        self.name = name if name is not None else "operation"
+        self.start_time = None
+        self.end_time = None
+
+    @property
+    def duration(self):
+        if self.start_time is None:
+            raise RuntimeError("Cannot get the duration for an operation that has not started yet")
+        if self.end_time is None:
+            return datetime.now() - self.start_time
+        return self.end_time - self.start_time
+
+    def __enter__(self):
+        self.start_time = datetime.now()
+        logger.debug(f"Starting {self.name}")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.end_time = datetime.now()
+        logger.info(f"Finished {self.name}. Duration: {self.duration}")
