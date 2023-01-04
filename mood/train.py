@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Optional
 
 import torch
@@ -12,7 +13,6 @@ from mood.dataset import SimpleMolecularDataset, DAMolecularDataset, domain_base
 from mood.model import MOOD_ALGORITHMS, is_domain_generalization, is_domain_adaptation
 from mood.model.base import Ensemble
 from mood.model.nn import get_simple_mlp
-from mood.utils import Timer
 
 
 BATCH_SIZE = 256
@@ -73,6 +73,11 @@ def train_torch_model(
     base = get_simple_mlp(len(train_dataset.X[0]), width, depth, out_size=None)
     head = get_simple_mlp(input_size=width, is_regression=is_regression)
 
+    # NOTE: Since the datasets are all very small,
+    #   setting up and syncing the threads takes longer than
+    #   what we gain by using the threads
+    no_workers = 0
+
     models = []
     for i in range(ensemble_size):
         model = MOOD_ALGORITHMS[algorithm](
@@ -85,16 +90,26 @@ def train_torch_model(
 
         if is_domain_adaptation(model):
             train_dataset_da = DAMolecularDataset(source_dataset=train_dataset, target_dataset=test_dataset)
-            train_dataloader = DataLoader(train_dataset_da, batch_size=BATCH_SIZE, shuffle=True)
-            val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
+            train_dataloader = DataLoader(
+                train_dataset_da, batch_size=BATCH_SIZE, shuffle=True, num_workers=no_workers
+            )
+            val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, num_workers=no_workers)
         elif is_domain_generalization(model):
             train_dataloader = DataLoader(
-                train_dataset, batch_size=BATCH_SIZE, shuffle=True, collate_fn=domain_based_collate
+                train_dataset,
+                batch_size=BATCH_SIZE,
+                shuffle=True,
+                collate_fn=domain_based_collate,
+                num_workers=no_workers,
             )
-            val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, collate_fn=domain_based_collate)
+            val_dataloader = DataLoader(
+                val_dataset, batch_size=BATCH_SIZE, collate_fn=domain_based_collate, num_workers=no_workers
+            )
         else:
-            train_dataloader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-            val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
+            train_dataloader = DataLoader(
+                train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=no_workers
+            )
+            val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, num_workers=no_workers)
 
         callbacks = [EarlyStopping("val_loss", patience=10, mode="min")]
         trainer = Trainer(

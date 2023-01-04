@@ -170,7 +170,7 @@ class Mixup(BaseModel):
         params["penalty_weight_schedule"] = trial.suggest_categorical(
             "penalty_weight_schedule", [[0, 25], [0, 50], [0, 0], [25, 50]]
         )
-        params["augmentation_std"] = trial.suggest_categorical("augmentation_std", 0.001, 0.15)
+        params["augmentation_std"] = trial.suggest_float("augmentation_std", 0.001, 0.15)
         params["no_augmentations"] = trial.suggest_categorical("no_augmentations", [3, 5, 10])
         params["alpha"] = trial.suggest_float("alpha", 0.0, 1.0)
         return params

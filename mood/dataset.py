@@ -10,7 +10,7 @@ from tdc.single_pred import ADME, Tox
 from tdc.metadata import dataset_names
 from torch.utils.data import default_collate
 
-from mood.chemistry import compute_murcko_scaffold
+from mood.chemistry import compute_generic_scaffold
 from mood.constants import CACHE_DIR
 
 
@@ -26,7 +26,7 @@ class SimpleMolecularDataset(torch.utils.data.Dataset):
         self.X = X
         self.y = y
         self.random_state = None
-        self.domains = np.array([compute_murcko_scaffold(smi) for smi in self.smiles])
+        self.domains = np.array([compute_generic_scaffold(smi) for smi in self.smiles])
 
     def __getitem__(self, index):
         x = self.X[index]

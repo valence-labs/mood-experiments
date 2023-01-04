@@ -1,4 +1,6 @@
 import itertools
+import zlib
+
 import numpy as np
 
 from mood.model import MOOD_ALGORITHMS
@@ -39,6 +41,7 @@ def get_experimental_configurations(dataset):
             list(range(NUM_SEEDS)),
         )
     )
-    rng = np.random.default_rng(RCT_SEED)
+    # NOTE: We add the hash of the dataset to make the sampled configurations dataset-dependent
+    rng = np.random.default_rng(RCT_SEED + zlib.adler32(dataset.encode("utf-8")))
     rng.shuffle(all_options)
     return all_options

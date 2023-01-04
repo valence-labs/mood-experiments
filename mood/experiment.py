@@ -160,7 +160,7 @@ def rct_tuning_loop(
     """
 
     rng = np.random.default_rng(global_seed)
-    seeds = rng.integers(0, 2 ** 16, num_trials)
+    seeds = rng.integers(0, 2**16, num_trials)
 
     def run_trial(trial: optuna.Trial):
 
@@ -243,6 +243,7 @@ def tune_cmd(
     use_cache: bool = False,
     base_save_dir: str = RESULTS_DIR,
     sub_save_dir: Optional[str] = None,
+    overwrite: bool = False,
 ):
     """
     The MOOD tuning loop: Runs a hyper-parameter search.
@@ -250,6 +251,23 @@ def tune_cmd(
     Prescribes a train-test split based on the MOOD specification and runs a hyper-parameter search
     for the training set.
     """
+
+    if sub_save_dir is None:
+        sub_save_dir = datetime.now().strftime("%Y%m%d")
+
+    csv_out_dir = dm.fs.join(base_save_dir, "dataframes", "RCT", sub_save_dir)
+    csv_fname = f"rct_study_{algorithm}_{representation}_{train_val_split}_{criterion}_{seed}.csv"
+    csv_path = dm.fs.join(csv_out_dir, csv_fname)
+    dm.fs.mkdir(csv_out_dir, exist_ok=True)
+
+    yaml_out_dir = dm.fs.join(base_save_dir, "YAML", "RCT", sub_save_dir)
+    yaml_fname = f"rct_selected_model_{algorithm}_{representation}_{train_val_split}_{criterion}_{seed}.yaml"
+    yaml_path = dm.fs.join(yaml_out_dir, yaml_fname)
+    dm.fs.mkdir(yaml_out_dir, exist_ok=True)
+
+    if not overwrite and (dm.fs.exists(yaml_path) or dm.fs.exists(csv_path)):
+        logger.info(f"One of the files already exists and overwrite=False. Skipping!")
+        return
 
     # Load and preprocess the data
     smiles, y = load_data_from_tdc(dataset, disable_logs=True)
@@ -295,28 +313,19 @@ def tune_cmd(
         global_seed=seed,
     )
 
-    if sub_save_dir is None:
-        sub_save_dir = datetime.now().strftime("%Y%m%d")
-
     # Save the full trial results as a CSV
-    csv_out_dir = dm.fs.join(base_save_dir, "dataframes", "RCT", sub_save_dir)
-    dm.fs.mkdir(csv_out_dir, exist_ok=True)
-
-    csv_path = dm.fs.join(
-        csv_out_dir, f"rct_study_{algorithm}_{representation}_{train_val_split}_{criterion}_{seed}.csv"
-    )
     logger.info(f"Saving the full study data to {csv_path}")
-    study.trials_dataframe().to_csv(csv_path)
+    df = study.trials_dataframe()
+    df["dataset"] = dataset
+    df["algorithm"] = algorithm
+    df["representation"] = representation
+    df["train-val split"] = train_val_split
+    df["criterion"] = df["criterion"]
+    df["seed"] = seed
+    df.to_csv(csv_path)
 
     # Save the most important information as YAML (higher precision)
-    data = {"hparams": study.best_params, **study.best_trial.user_attrs, "criterion": study.best_value}
-    yaml_out_dir = dm.fs.join(base_save_dir, "YAML", "RCT", sub_save_dir)
-    dm.fs.mkdir(csv_out_dir, exist_ok=True)
-
-    yaml_path = dm.fs.join(
-        yaml_out_dir,
-        f"rct_selected_model_{algorithm}_{representation}_{train_val_split}_{criterion}_{seed}.yaml",
-    )
+    data = {"hparams": study.best_params, "criterion": study.best_value, **study.best_trial.user_attrs}
     logger.info(f"Saving the data of the best model to {yaml_path}")
     with fsspec.open(yaml_path, "w") as fd:
         yaml.dump(data, fd)
@@ -327,6 +336,7 @@ def rct_cmd(
     index: int,
     base_save_dir: str = RESULTS_DIR,
     sub_save_dir: Optional[str] = None,
+    overwrite: bool = False,
 ):
     """
     Entrypoint for the benchmarking study in the MOOD Investigation.
@@ -351,4 +361,5 @@ def rct_cmd(
         seed=seed,
         base_save_dir=base_save_dir,
         sub_save_dir=sub_save_dir,
+        overwrite=overwrite,
     )

@@ -77,8 +77,13 @@ class VREx(BaseModel):
 
         erm_losses = torch.stack(erm_losses)
         erm_loss = erm_losses.mean()
-        rex_penalty = erm_losses.var()
-        loss = erm_loss + penalty_weight * rex_penalty
+
+        # NOTE: A batch can have just a single domain
+        if len(batch) == 1:
+            loss = erm_loss
+        else:
+            rex_penalty = erm_losses.var()
+            loss = erm_loss + penalty_weight * rex_penalty
 
         self.log("loss", loss)
         return loss
