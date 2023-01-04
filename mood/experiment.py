@@ -111,8 +111,6 @@ def rct_dataset_setup(dataset, train_indices, val_indices, is_regression):
 
     # Z-standardization of the targets
     if is_regression:
-        # We do not need to standardize the test set here as its y-values are never used.
-        # The unannotated molecular representations are only used for DA algorithms
         scaler = StandardScaler()
         train_dataset.y = scaler.fit_transform(train_dataset.y)
         val_dataset.y = scaler.transform(val_dataset.y)
@@ -160,18 +158,22 @@ def rct_tuning_loop(
     the MOOD investigation. It combines training scikit-learn and pytorch (lightning) models.
     """
 
+    rng = np.random.default_rng(global_seed)
+    seeds = rng.integers(0, 2 ** 16, num_trials)
+
     def run_trial(trial: optuna.Trial):
 
-        random_state = global_seed + trial.number
+        random_state = seeds[trial.number]
 
         splitters = get_mood_splitters(train_val_dataset.smiles, num_repeated_splits, random_state, n_jobs=-1)
         train_val_splitter = splitters[train_val_split]
 
         for split_idx, (train_ind, val_ind) in enumerate(train_val_splitter.split(train_val_dataset.X)):
 
-            train_dataset, val_dataset, _ = rct_dataset_setup(
-                train_val_dataset, train_ind, val_ind, random_state, is_regression
+            train_dataset, val_dataset, scaler = rct_dataset_setup(
+                train_val_dataset, train_ind, val_ind, is_regression
             )
+            test_dataset.y = scaler.transform(test_dataset.y)
 
             if algorithm in MOOD_ALGORITHMS:
                 params = MOOD_ALGORITHMS[algorithm].suggest_params(trial)
@@ -211,6 +213,7 @@ def rct_tuning_loop(
             trial.set_user_attr(f"val_calibration_{split_idx}", val_cal_score)
             trial.set_user_attr(f"test_performance_{split_idx}", test_prf_score)
             trial.set_user_attr(f"test_calibration_{split_idx}", test_cal_score)
+            trial.set_user_attr(f"seed_iter_{split_idx}", random_state)
 
             criterion.update(val_y_pred, val_uncertainty, train_dataset, val_dataset)
 
