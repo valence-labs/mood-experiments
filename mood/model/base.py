@@ -84,7 +84,7 @@ class BaseModel(LightningModule, abc.ABC):
     def suggest_params(trial):
         width = trial.suggest_categorical("mlp_width", [64, 128, 256, 512])
         depth = trial.suggest_int("mlp_depth", 1, 5)
-        lr = trial.suggest_float("lr", 1e-8, 1.0, log=True)
+        lr = trial.suggest_float("lr", 1e-8, 1e-1, log=True)
         weight_decay = trial.suggest_categorical(
             "weight_decay", ["auto", 0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0]
         )

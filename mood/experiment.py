@@ -320,7 +320,7 @@ def tune_cmd(
     df["algorithm"] = algorithm
     df["representation"] = representation
     df["train-val split"] = train_val_split
-    df["criterion"] = df["criterion"]
+    df["criterion"] = criterion
     df["seed"] = seed
     df.to_csv(csv_path)
 

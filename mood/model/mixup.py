@@ -85,6 +85,7 @@ class Mixup(BaseModel):
         (x_src, _), y_src = batch_src
         x_tgt, _ = batch_tgt
         y_tgt = self._get_pseudo_labels(x_tgt)
+
         penalty_weight = linear_interpolation(
             step=self.current_epoch,
             duration=self.duration,
@@ -140,7 +141,6 @@ class Mixup(BaseModel):
         # Intra target domain
         else:
             loss = self.loss_fn(y_pred_st, y_st)
-
         return loss
 
     def _get_random_pairs(self, x_src, x_tgt, y_src, y_tgt, size):
@@ -152,7 +152,7 @@ class Mixup(BaseModel):
         x_src = x_src[indices]
         y_src = y_src[indices]
 
-        indices = torch.multinomial(torch.ones(len(y_tgt), device=y_tgt.device), size, replacement=True)
+        indices = torch.multinomial(torch.ones(len(x_tgt), device=x_tgt.device), size, replacement=True)
         x_tgt = x_tgt[indices]
         y_tgt = y_tgt[indices]
 
