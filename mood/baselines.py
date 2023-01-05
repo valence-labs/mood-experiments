@@ -2,7 +2,6 @@ import optuna
 import numpy as np
 import datamol as dm
 
-from scipy.stats import entropy
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, VotingRegressor, VotingClassifier
 from sklearn.neural_network import MLPRegressor, MLPClassifier
 from sklearn.gaussian_process import GaussianProcessRegressor, GaussianProcessClassifier
@@ -84,10 +83,7 @@ def predict_baseline_uncertainty(model, X):
     For regressors, the variance of the prediction is used as uncertainty.
     """
     if isinstance(model, ClassifierMixin):
-        proba = model.predict_proba(X)[:, 1]
-        x_0 = np.clip(proba, 1e-10, 1.0 - 1e-10)
-        x_1 = 1.0 - x_0
-        uncertainty = entropy([x_0, x_1], base=2)
+        uncertainty = model.predict_proba(X)
 
     elif isinstance(model, GaussianProcessRegressor):
         std = model.predict(X, return_std=True)[1]

@@ -1,7 +1,9 @@
 import logging
-from typing import Optional
-
+import random
+import numpy as np
 import torch
+
+from typing import Optional
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from lightning_lite.utilities.seed import seed_everything
@@ -25,11 +27,15 @@ def train_baseline_model(
     for_uncertainty_estimation: bool = False,
     ensemble_size: int = 10,
     calibrate: bool = False,
+    n_jobs: int = -1,
 ):
     if params is None:
         params = {}
     if seed is not None:
         params["random_state"] = seed
+
+    if algorithm == "RF" or (algorithm == "GP" and not is_regression):
+        params["n_jobs"] = n_jobs
 
     if algorithm == "RF" and not is_regression:
         params["class_weight"] = "balanced"
@@ -66,9 +72,6 @@ def train_torch_model(
     width = params.pop("mlp_width")
     depth = params.pop("mlp_depth")
 
-    base = get_simple_mlp(len(train_dataset.X[0]), width, depth, out_size=None)
-    head = get_simple_mlp(input_size=width * 2 if algorithm == "MTL" else width, is_regression=is_regression)
-
     # NOTE: Since the datasets are all very small,
     #   setting up and syncing the threads takes longer than
     #   what we gain by using the threads
@@ -76,6 +79,10 @@ def train_torch_model(
 
     models = []
     for i in range(ensemble_size):
+
+        base = get_simple_mlp(len(train_dataset.X[0]), width, depth, out_size=None)
+        head = get_simple_mlp(input_size=width * 2 if algorithm == "MTL" else width, is_regression=is_regression)
+
         model = MOOD_ALGORITHMS[algorithm](
             base_network=base,
             prediction_head=head,
@@ -133,6 +140,7 @@ def train(
     params: dict,
     seed: int,
     calibrate: bool = False,
+    ensemble_size: int = 5,
 ):
     # NOTE: The order here matters since there are two MLP implementations
     #  In this case, we want to use the torch implementation.
@@ -150,7 +158,7 @@ def train(
             is_regression=is_regression,
             params=params,
             seed=seed,
-            ensemble_size=5,
+            ensemble_size=ensemble_size,
         )
 
     elif algorithm in MOOD_BASELINES:
@@ -162,7 +170,7 @@ def train(
             params=params,
             seed=seed,
             for_uncertainty_estimation=True,
-            ensemble_size=5,
+            ensemble_size=ensemble_size,
             calibrate=calibrate,
         )
 

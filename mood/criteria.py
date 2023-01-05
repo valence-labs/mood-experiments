@@ -29,8 +29,9 @@ class ModelSelectionCriterion(abc.ABC):
     For example, you might train and evaluate a model on N different splits before scoring the hyper-parameters.
     """
 
-    def __init__(self, mode):
+    def __init__(self, mode, needs_uncertainty: bool):
         self.mode = mode
+        self.needs_uncertainty = needs_uncertainty
         self.scores = []
 
     @abc.abstractmethod
@@ -61,8 +62,8 @@ class PerformanceCriterion(ModelSelectionCriterion):
     """Select models based on the mean validation performance."""
 
     def __init__(self, metric: Metric):
-        super().__init__(mode=metric.mode)
-        if metric.needs_uncertainty or not metric.needs_predictions:
+        super().__init__(mode=metric.mode, needs_uncertainty=False)
+        if metric.is_calibration:
             raise ValueError(f"{metric.name} cannot be used with {type(self).__name__}")
         self.metric = metric
 
@@ -95,8 +96,8 @@ class CalibrationCriterion(ModelSelectionCriterion):
     """Select a model based on the mean validation calibration"""
 
     def __init__(self, metric: Metric):
-        super().__init__(mode=metric.mode)
-        if not metric.needs_uncertainty:
+        super().__init__(mode=metric.mode, needs_uncertainty=True)
+        if not metric.is_calibration:
             raise ValueError(f"{metric.name} cannot be used with {type(self).__name__}")
         self.metric = metric
 
@@ -111,7 +112,7 @@ class CombinedCriterion(ModelSelectionCriterion):
     the performance score by the calibration score"""
 
     def __init__(self, performance_metric: Metric, calibration_metric: Metric):
-        super().__init__(mode=performance_metric.mode)
+        super().__init__(mode=performance_metric.mode, needs_uncertainty=True)
 
         vmin, vmax = calibration_metric.range
         if vmin is None or vmax is None:

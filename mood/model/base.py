@@ -2,7 +2,6 @@ import abc
 from functools import partial
 
 import torch
-from scipy.stats import entropy
 from torch import nn
 from itertools import tee
 from typing import Optional, Union
@@ -101,12 +100,12 @@ class Ensemble(LightningModule):
         return torch.stack([model.predict(dataloader) for model in self.models]).mean(dim=0)
 
     def predict_uncertainty(self, dataloader):
-
         if self.is_regression:
-            return torch.stack([model.predict(dataloader) for model in self.models]).var(dim=0)
-
+            if len(self.models) == 1:
+                uncertainty = None
+            else:
+                uncertainty = torch.stack([model.predict(dataloader) for model in self.models]).var(dim=0)
         else:
             proba = self.predict(dataloader)[:, 0]
-            x_0 = torch.clip(proba, 1e-10, 1.0 - 1e-10).detach().cpu().numpy()
-            x_1 = 1.0 - x_0
-            return entropy([x_0, x_1], base=2)
+            uncertainty = torch.stack([proba, 1.0 - proba], dim=1)
+        return uncertainty

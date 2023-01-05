@@ -64,7 +64,7 @@ def weighted_mae(preds, target, sample_weights=None):
 
 
 def weighted_brier_score(target, uncertainty, sample_weights=None):
-    confidence = 1.0 - uncertainty
+    confidence = torch.stack([unc[tar] for unc, tar in zip(uncertainty, target)])
     if sample_weights is None:
         return mean_squared_error(confidence, target)
     summed_mse = torch.square(sample_weights * (confidence - target)).sum()
@@ -112,6 +112,10 @@ class Metric:
         self.range_min = range_min
         self.range_max = range_max
 
+    @property
+    def is_calibration(self):
+        return self.needs_uncertainty
+
     @classmethod
     def get_default_calibration_metric(cls, dataset):
         is_regression = dataset in MOOD_REGR_DATASETS
@@ -133,23 +137,48 @@ class Metric:
     @classmethod
     def by_name(cls, name):
         if name == "MAE":
-            return cls("MAE", weighted_mae, "min", TargetType.REGRESSION, True, False, 0, None)
+            return cls(
+                name="MAE",
+                fn=weighted_mae,
+                mode="min",
+                target_type=TargetType.REGRESSION,
+                needs_predictions=True,
+                needs_uncertainty=False,
+                range_min=0,
+                range_max=None
+            )
         elif name == "Spearman":
             return cls(
-                "Spearman", weighted_spearman_calibration, "max", TargetType.REGRESSION, True, True, -1, 1
+                name="Spearman",
+                fn=weighted_spearman_calibration,
+                mode="max",
+                target_type=TargetType.REGRESSION,
+                needs_predictions=True,
+                needs_uncertainty=True,
+                range_min=-1,
+                range_max=1,
             )
         elif name == "AUROC":
-            return cls("AUROC", weighted_auroc, "max", TargetType.BINARY_CLASSIFICATION, True, False, 0, 1)
+            return cls(
+                name="AUROC",
+                fn=weighted_auroc,
+                mode="max",
+                target_type=TargetType.BINARY_CLASSIFICATION,
+                needs_predictions=True,
+                needs_uncertainty=False,
+                range_min=0,
+                range_max=1,
+            )
         elif name == "Brier score":
             return cls(
-                "Brier score",
-                weighted_brier_score,
-                "min",
-                TargetType.BINARY_CLASSIFICATION,
-                False,
-                True,
-                0,
-                1,
+                name="Brier score",
+                fn=weighted_brier_score,
+                mode="min",
+                target_type=TargetType.BINARY_CLASSIFICATION,
+                needs_predictions=False,
+                needs_uncertainty=True,
+                range_min=0,
+                range_max=1,
             )
 
     def __call__(
