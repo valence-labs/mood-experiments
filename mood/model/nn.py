@@ -87,11 +87,7 @@ class FCLayer(nn.Module):
         return self.out_size
 
     @property
-    def out_features(self):
-        return self.out_size
-
-    @property
-    def in_features(self):
+    def input_dim(self):
         return self.in_size
 
     def forward(self, x):
@@ -167,12 +163,15 @@ class MLP(nn.Module):
             in_ = out_
 
         layers.append(FCLayer(in_, out_size, activation=out_activation, b_norm=b_norm, dropout=False))
-        self.__output_dim = out_size
         self.extractor = nn.Sequential(*layers)
 
     @property
     def output_dim(self):
-        return self.__output_dim
+        return self.extractor[-1].output_dim
+
+    @property
+    def input_dim(self):
+        return self.extractor[0].input_dim
 
     def forward(self, x):
         x = Flatten()(x)

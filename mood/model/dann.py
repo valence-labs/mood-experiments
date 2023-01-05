@@ -1,4 +1,4 @@
-from itertools import chain
+from itertools import chain, tee
 
 import torch
 import torch.nn.functional as F
@@ -65,7 +65,7 @@ class DANN(BaseModel):
 
         self._discriminator_network = discriminator_network
         if self._discriminator_network is None:
-            self._discriminator_network = FCLayer(prediction_head.in_size, 2, activation=None)
+            self._discriminator_network = FCLayer(prediction_head.input_dim, 2, activation=None)
 
         self.penalty_weight = penalty_weight
         if len(penalty_weight_schedule) != 2:
@@ -79,25 +79,39 @@ class DANN(BaseModel):
         self.lambda_reg = lambda_reg
         self._n_discr_steps_per_predictor_step = n_discr_steps_per_predictor_step
 
+    @staticmethod
+    def get_optimizer(parameters, lr, weight_decay, monitor: str = "val_loss"):
+
+        if weight_decay == "auto":
+            parameters, parameters_copy = tee(parameters)
+            weight_decay = 1.0 / sum(p.numel() for p in parameters_copy if p.requires_grad)
+
+        optimizer = torch.optim.Adam(parameters, lr=lr, weight_decay=weight_decay)
+        lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+        return {
+            "optimizer": optimizer,
+            "lr_scheduler": {
+                "scheduler": lr_scheduler,
+                "interval": "epoch",
+                "frequency": 1,
+                "monitor": monitor,
+                "strict": True,
+            },
+        }
+
     def configure_optimizers(self):
 
         optimizer_predictor = self.get_optimizer(
             chain(self.base_network.parameters(), self.prediction_head.parameters()),
-            self.opt,
             self.lr,
-            self.scheduler,
             self.l2,
-            "train_predictive_loss",
         )
         optimizer_predictor["frequency"] = self._n_discr_steps_per_predictor_step
 
         optimizer_discriminator = self.get_optimizer(
             chain(self.base_network.parameters(), self._discriminator_network.parameters()),
-            self.opt,
             self.discr_lr,
-            self.scheduler,
             self.discr_l2,
-            "train_discriminator_loss",
         )
         optimizer_discriminator["frequency"] = 1
 
@@ -189,8 +203,8 @@ class DANN(BaseModel):
     def suggest_params(trial):
         params = BaseModel.suggest_params(trial)
         params["penalty_weight"] = trial.suggest_float("penalty_weight", 1e-10, 1.0, log=True)
-        params["penalty_weight_schedule"] = trial.suggest_float(
-            "penalty_weight_schedule", 1e-10, 1.0, log=True
+        params["penalty_weight_schedule"] = trial.suggest_categorical(
+            "penalty_weight_schedule", [[0, 25], [0, 50], [0, 0], [25, 50]]
         )
         params["discr_lr"] = trial.suggest_float("discr_lr", 1e-8, 1.0, log=True)
         params["discr_weight_decay"] = trial.suggest_categorical(
