@@ -28,7 +28,7 @@ def get_experimental_configurations(dataset):
 
     mood_criteria = get_mood_criteria(prf_metric, cal_metric).keys()
 
-    mood_baselines = MOOD_BASELINES
+    mood_baselines = MOOD_BASELINES.copy()
     mood_baselines.pop(mood_baselines.index("MLP"))
     mood_algorithms = mood_baselines + list(MOOD_ALGORITHMS.keys())
 

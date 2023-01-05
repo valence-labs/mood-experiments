@@ -13,12 +13,17 @@ from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
 
 from mood.baselines import suggest_baseline_hparams, predict_baseline_uncertainty
-from mood.constants import RESULTS_DIR
-from mood.model import MOOD_ALGORITHMS
+from mood.constants import RESULTS_DIR, BATCH_SIZE
+from mood.model import MOOD_ALGORITHMS, needs_domain_representation, is_domain_generalization
 from mood.model.base import Ensemble
 from mood.train import train_baseline_model, train
 from mood.criteria import get_mood_criteria
-from mood.dataset import load_data_from_tdc, SimpleMolecularDataset, MOOD_REGR_DATASETS
+from mood.dataset import (
+    load_data_from_tdc,
+    SimpleMolecularDataset,
+    MOOD_REGR_DATASETS,
+    domain_based_inference_collate,
+)
 from mood.distance import get_distance_metric
 from mood.metrics import Metric
 from mood.representations import featurize
@@ -125,7 +130,8 @@ def rct_predict_step(model, dataset):
         y_pred = model.predict(dataset.X).reshape(-1, 1)
         uncertainty = predict_baseline_uncertainty(model, dataset.X)
     elif isinstance(model, Ensemble):
-        dataloader = DataLoader(dataset)
+        collate_fn = domain_based_inference_collate if is_domain_generalization(model.models[0]) else None
+        dataloader = DataLoader(dataset, collate_fn=collate_fn, batch_size=BATCH_SIZE)
         y_pred = model.predict(dataloader)
         uncertainty = model.predict_uncertainty(dataloader)
     else:
@@ -299,6 +305,10 @@ def tune_cmd(
     trainval, test = next(train_test_splitter.split(X, y))
     train_val_dataset = SimpleMolecularDataset(smiles[trainval], X[trainval], y[trainval])
     test_dataset = SimpleMolecularDataset(smiles[test], X[test], y[test])
+
+    if needs_domain_representation(algorithm):
+        train_val_dataset.compute_domain_representations()
+        test_dataset.compute_domain_representations()
 
     # Run the hyper-parameter search
     study = rct_tuning_loop(

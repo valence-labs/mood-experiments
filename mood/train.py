@@ -1,5 +1,4 @@
 import logging
-import os
 from typing import Optional
 
 import torch
@@ -9,14 +8,11 @@ from lightning_lite.utilities.seed import seed_everything
 from torch.utils.data import DataLoader
 
 from mood.baselines import construct_kernel, get_baseline_model, MOOD_BASELINES
+from mood.constants import BATCH_SIZE, NUM_EPOCHS
 from mood.dataset import SimpleMolecularDataset, DAMolecularDataset, domain_based_collate
 from mood.model import MOOD_ALGORITHMS, is_domain_generalization, is_domain_adaptation
 from mood.model.base import Ensemble
 from mood.model.nn import get_simple_mlp
-
-
-BATCH_SIZE = 256
-NUM_EPOCHS = 100
 
 
 def train_baseline_model(
@@ -71,7 +67,7 @@ def train_torch_model(
     depth = params.pop("mlp_depth")
 
     base = get_simple_mlp(len(train_dataset.X[0]), width, depth, out_size=None)
-    head = get_simple_mlp(input_size=width, is_regression=is_regression)
+    head = get_simple_mlp(input_size=width * 2 if algorithm == "MTL" else width, is_regression=is_regression)
 
     # NOTE: Since the datasets are all very small,
     #   setting up and syncing the threads takes longer than

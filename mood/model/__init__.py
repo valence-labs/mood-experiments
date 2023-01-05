@@ -23,13 +23,26 @@ MOOD_ALGORITHMS = {
 }
 
 
-def is_domain_adaptation(model: Union[BaseEstimator, BaseModel]):
-    if not (isinstance(model, BaseEstimator) or isinstance(model, BaseModel)):
-        raise TypeError(f"Can only test models from sklearn, good-learn or mood, not {type(model)}")
-    return isinstance(model, Mixup) or isinstance(model, DANN) or isinstance(model, CORAL)
+def _get_type(model: Union[BaseEstimator, BaseModel, str]):
+    if isinstance(model, str):
+        model_type = MOOD_ALGORITHMS.get(model)
+    else:
+        model_type = type(model)
+    if not (model_type is None or issubclass(model_type, BaseEstimator) or issubclass(model_type, BaseModel)):
+        raise TypeError(f"Can only test models from sklearn, good-learn or mood, not {model_type}")
+    return model_type
 
 
-def is_domain_generalization(model: Union[BaseEstimator, BaseModel]):
-    if not (isinstance(model, BaseEstimator) or isinstance(model, BaseModel)):
-        raise TypeError(f"Can only test models from sklearn, good-learn or mood, not {type(model)}")
-    return isinstance(model, MTL) or isinstance(model, InformationBottleneckERM) or isinstance(model, VREx)
+def is_domain_adaptation(model: Union[BaseEstimator, BaseModel, str]):
+    model_type = _get_type(model)
+    return model_type in [Mixup, DANN, CORAL]
+
+
+def is_domain_generalization(model: Union[BaseEstimator, BaseModel, str]):
+    model_type = _get_type(model)
+    return model_type in [MTL, InformationBottleneckERM, VREx]
+
+
+def needs_domain_representation(model: Union[BaseEstimator, BaseModel, str]):
+    model_type = _get_type(model)
+    return model_type == MTL

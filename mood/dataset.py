@@ -27,15 +27,27 @@ class SimpleMolecularDataset(torch.utils.data.Dataset):
         self.y = y
         self.random_state = None
         self.domains = np.array([compute_generic_scaffold(smi) for smi in self.smiles])
+        self.domain_representations = None
 
     def __getitem__(self, index):
         x = self.X[index]
         if self.domains is not None:
-            x = (x, self.domains[index])
+            d = self.domains[index]
+            if self.domain_representations is not None:
+                d = (d, self.domain_representations[d])
+            x = (x, d)
         return x, self.y[index]
 
     def __len__(self):
         return len(self.X)
+
+    def compute_domain_representations(self):
+        self.domain_representations = {}
+        unique_domains, inverse = np.unique(self.domains, return_inverse=True, axis=0)
+        for idx in np.unique(inverse):
+            indices = np.flatnonzero(inverse == idx)
+            representation = self.X[indices].mean(axis=0)
+            self.domain_representations[unique_domains[idx]] = representation
 
     def filter_by_indices(self, indices):
         cpy = deepcopy(self)
@@ -68,15 +80,28 @@ class DAMolecularDataset(torch.utils.data.Dataset):
 def domain_based_collate(batch):
     """Custom collate function that splits a single batch into several mini-batches based on the domain.
     Doing that here instead of on the GPU is faster."""
-    domains = [domain for (X, domain), y in batch]
+
+    domains = [domain[0] if isinstance(domain, tuple) else domain for (X, domain), y in batch]
+    batch = [
+        ((X, domain[1]), y) if isinstance(domain, tuple) else ((X, domain), y) for (X, domain), y in batch
+    ]
     _, inverse = np.unique(domains, return_inverse=True, axis=0)
 
     mini_batches = []
     for idx in np.unique(inverse):
         indices = np.flatnonzero(inverse == idx)
-        mini_batch = default_collate([batch[i] for i in indices])
+        mini_batch = [batch[i] for i in indices]
+        mini_batch = default_collate(mini_batch)
         mini_batches.append(mini_batch)
     return mini_batches
+
+
+def domain_based_inference_collate(batch):
+    """Custom collate function that preprocesses our custom dataset for inference."""
+    batch = [
+        ((X, domain[1]), y) if isinstance(domain, tuple) else ((X, domain), y) for (X, domain), y in batch
+    ]
+    return default_collate(batch)
 
 
 def load_data_from_tdc(name: str, disable_logs: bool = False):
