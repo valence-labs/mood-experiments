@@ -334,9 +334,13 @@ def tune_cmd(
         ensemble_size=5
     )
 
-    test_y_pred, uncertainties = rct_predict_step(model, test_dataset)
+    test_y_pred, test_uncertainties = rct_predict_step(model, test_dataset)
     test_prf_score = performance_metric(test_dataset.y, test_y_pred)
-    test_cal_score = calibration_metric(test_dataset.y, test_y_pred, uncertainties)
+    test_cal_score = calibration_metric(test_dataset.y, test_y_pred, test_uncertainties)
+
+    val_y_pred, val_uncertainties = rct_predict_step(model, val_dataset)
+    val_prf_score = performance_metric(val_dataset.y, val_y_pred)
+    val_cal_score = calibration_metric(val_dataset.y, val_y_pred, val_uncertainties)
 
     # Save the full trial results as a CSV
     logger.info(f"Saving the full study data to {csv_path}")
@@ -354,7 +358,9 @@ def tune_cmd(
         "hparams": study.best_params,
         "criterion_final": study.best_value,
         "test_performance_final": test_prf_score,
+        "val_performance_final": val_prf_score,
         "test_calibration_final": test_cal_score,
+        "val_calibration_final": val_cal_score,
         "dataset": dataset,
         "algorithm": algorithm,
         "representation": representation,
