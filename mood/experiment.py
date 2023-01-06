@@ -256,8 +256,8 @@ def tune_cmd(
     yaml_path = dm.fs.join(yaml_out_dir, yaml_fname)
     dm.fs.mkdir(yaml_out_dir, exist_ok=True)
 
-    if not overwrite and (dm.fs.exists(yaml_path) or dm.fs.exists(csv_path)):
-        logger.info(f"One of the files already exists and overwrite=False. Skipping!")
+    if not overwrite and dm.fs.exists(yaml_path) and dm.fs.exists(csv_path):
+        logger.info(f"Both the files already exists and overwrite=False. Skipping!")
         return
 
     # Load and preprocess the data
