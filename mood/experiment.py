@@ -163,7 +163,8 @@ def rct_tuning_loop(
 
     def run_trial(trial: optuna.Trial):
 
-        random_state = seeds[trial.number]
+        random_state = seeds[trial.number].item()
+        trial.set_user_attr(f"seed", random_state)
 
         splitters = get_mood_splitters(train_val_dataset.smiles, num_repeated_splits, random_state, n_jobs=-1)
         train_val_splitter = splitters[train_val_split]
@@ -204,7 +205,6 @@ def rct_tuning_loop(
             # NOTE: Ideally we would do this for calibration too, but that was too computationally expensive
             trial.set_user_attr(f"val_performance_{split_idx}", val_prf_score)
             trial.set_user_attr(f"test_performance_{split_idx}", test_prf_score)
-            trial.set_user_attr(f"seed_iter_{split_idx}", random_state)
 
             criterion.update(val_y_pred, val_uncertainty, train_dataset, val_dataset)
 
@@ -247,12 +247,12 @@ def tune_cmd(
         sub_save_dir = datetime.now().strftime("%Y%m%d")
 
     csv_out_dir = dm.fs.join(base_save_dir, "dataframes", "RCT", sub_save_dir)
-    csv_fname = f"rct_study_{algorithm}_{representation}_{train_val_split}_{criterion}_{seed}.csv"
+    csv_fname = f"rct_study_{dataset}_{algorithm}_{representation}_{train_val_split}_{criterion}_{seed}.csv"
     csv_path = dm.fs.join(csv_out_dir, csv_fname)
     dm.fs.mkdir(csv_out_dir, exist_ok=True)
 
     yaml_out_dir = dm.fs.join(base_save_dir, "YAML", "RCT", sub_save_dir)
-    yaml_fname = f"rct_selected_model_{algorithm}_{representation}_{train_val_split}_{criterion}_{seed}.yaml"
+    yaml_fname = f"rct_selected_model_{dataset}_{algorithm}_{representation}_{train_val_split}_{criterion}_{seed}.yaml"
     yaml_path = dm.fs.join(yaml_out_dir, yaml_fname)
     dm.fs.mkdir(yaml_out_dir, exist_ok=True)
 
@@ -352,9 +352,15 @@ def tune_cmd(
     # Save the most important information as YAML (higher precision)
     data = {
         "hparams": study.best_params,
-        "criterion": study.best_value,
-        "test_performance": test_prf_score,
-        "test_calibration": test_cal_score,
+        "criterion_final": study.best_value,
+        "test_performance_final": test_prf_score,
+        "test_calibration_final": test_cal_score,
+        "dataset": dataset,
+        "algorithm": algorithm,
+        "representation": representation,
+        "train_val_split": train_val_split,
+        "criterion": criterion,
+        "seed": seed,
         **study.best_trial.user_attrs
     }
     logger.info(f"Saving the data of the best model to {yaml_path}")
