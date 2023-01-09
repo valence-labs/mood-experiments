@@ -164,7 +164,7 @@ def rct_tuning_loop(
     def run_trial(trial: optuna.Trial):
 
         random_state = seeds[trial.number].item()
-        trial.set_user_attr(f"seed", random_state)
+        trial.set_user_attr("trial_seed", random_state)
 
         splitters = get_mood_splitters(train_val_dataset.smiles, num_repeated_splits, random_state, n_jobs=-1)
         train_val_splitter = splitters[train_val_split]
