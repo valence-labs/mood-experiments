@@ -321,7 +321,9 @@ def tune_cmd(
     # Train the best model found again, but this time as an ensemble
     # to evaluate the test performance and calibration
 
-    splitters = get_mood_splitters(train_val_dataset.smiles, 1, seed, n_jobs=-1)
+    # NOTE: Some methods are really sensitive to hyper-parameters (e.g. GPs)
+    #  So with a different train-val split, these might no longer succeed to train.
+    splitters = get_mood_splitters(train_val_dataset.smiles, 1, study.best_trial.user_attrs["trial_seed"], n_jobs=-1)
     train_val_splitter = splitters[train_val_split]
     train_ind, val_ind = next(train_val_splitter.split(train_val_dataset.X))
 
