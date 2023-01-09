@@ -41,11 +41,17 @@ def run_study(metric, algorithm, n_startup_trials, n_trials, trial_fn, seed):
 
     study = optuna.create_study(direction=direction, sampler=sampler)
 
-    # ValueError: array must not contain infs or NaNs
-    # LinAlgError: N-th leading minor of the array is not positive definite
-    # LinAlgError: The kernel is not returning a positive definite matrix
     if algorithm == "GP":
+        # ValueError: array must not contain infs or NaNs
+        # LinAlgError: N-th leading minor of the array is not positive definite
+        # LinAlgError: The kernel is not returning a positive definite matrix
         catch = (np.linalg.LinAlgError, ValueError)
+    elif algorithm == "Mixup":
+        # RuntimeError: all elements of input should be between 0 and 1
+        # NOTE: This is not robust (as other RunTimeErrors could be thrown)
+        #  but is an easy, performant way to check for NaN values which often
+        #  occurred for Mixup due to high losses on the first few batches
+        catch = (RuntimeError, )
     else:
         catch = ()
 
