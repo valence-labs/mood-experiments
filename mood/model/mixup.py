@@ -114,8 +114,8 @@ class Mixup(BaseModel):
         for i in range(self._no_augmentations):
             sample = xs * torch.normal(1, self._augmentation_std, xs.size(), device=xs.device)
             augmented_labels.append(self.forward(sample))
-        pseudo_labels = torch.stack(augmented_labels).mean(0)
-        return pseudo_labels
+        pseudo_labels = torch.stack(augmented_labels).mean(0).squeeze()
+        return torch.atleast_1d(pseudo_labels)
 
     def _loss(self, x_src, x_tgt, y_src, y_tgt, inter_domain: bool):
 
