@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import fsspec
 import optuna
 import numpy as np
@@ -117,8 +119,7 @@ def rct_dataset_setup(dataset, train_indices, val_indices, test_dataset, is_regr
 
     train_dataset = dataset.filter_by_indices(train_indices)
     val_dataset = dataset.filter_by_indices(val_indices)
-
-    scaler = None
+    test_dataset = deepcopy(test_dataset)
 
     # Z-standardization of the targets
     if is_regression:
@@ -127,7 +128,7 @@ def rct_dataset_setup(dataset, train_indices, val_indices, test_dataset, is_regr
         val_dataset.y = scaler.transform(val_dataset.y)
         test_dataset.y = scaler.transform(test_dataset.y)
 
-    return train_dataset, val_dataset, scaler
+    return train_dataset, val_dataset, test_dataset
 
 
 def rct_predict_step(model, dataset):
@@ -177,7 +178,7 @@ def rct_tuning_loop(
 
         for split_idx, (train_ind, val_ind) in enumerate(train_val_splitter.split(train_val_dataset.X)):
 
-            train_dataset, val_dataset, scaler = rct_dataset_setup(
+            train_dataset, val_dataset, test_dataset_inner = rct_dataset_setup(
                 train_val_dataset, train_ind, val_ind, test_dataset, is_regression
             )
 
@@ -189,7 +190,7 @@ def rct_tuning_loop(
             model = train(
                 train_dataset=train_dataset,
                 val_dataset=val_dataset,
-                test_dataset=test_dataset,
+                test_dataset=test_dataset_inner,
                 algorithm=algorithm,
                 is_regression=is_regression,
                 params=params,
@@ -203,14 +204,23 @@ def rct_tuning_loop(
             val_y_pred, val_uncertainty = rct_predict_step(model, val_dataset)
             val_prf_score = performance_metric(val_dataset.y, val_y_pred)
 
-            test_y_pred, _ = rct_predict_step(model, test_dataset)
-            test_prf_score = performance_metric(test_dataset.y, test_y_pred)
+            test_y_pred, test_uncertainty = rct_predict_step(model, test_dataset_inner)
+            test_prf_score = performance_metric(test_dataset_inner.y, test_y_pred)
+
+            # NOTE: Ideally we would do this always for calibration, but that was too computationally expensive
+            if test_uncertainty is not None and val_uncertainty is not None:
+                test_cal_score = calibration_metric(test_dataset_inner.y, test_y_pred, test_uncertainty)
+                val_cal_score = calibration_metric(val_dataset.y, val_y_pred, val_uncertainty)
+            else:
+                val_cal_score = None
+                test_cal_score = None
 
             # We save the val and test performance for each trial to analyze the success
             # of the model selection procedure (gap between best and selected model)
-            # NOTE: Ideally we would do this for calibration too, but that was too computationally expensive
             trial.set_user_attr(f"val_performance_{split_idx}", val_prf_score)
             trial.set_user_attr(f"test_performance_{split_idx}", test_prf_score)
+            trial.set_user_attr(f"val_calibration_{split_idx}", val_cal_score)
+            trial.set_user_attr(f"test_calibration_{split_idx}", test_cal_score)
 
             criterion.update(val_y_pred, val_uncertainty, train_dataset, val_dataset)
 
@@ -323,11 +333,12 @@ def tune_cmd(
 
     # NOTE: Some methods are really sensitive to hyper-parameters (e.g. GPs)
     #  So with a different train-val split, these might no longer succeed to train.
-    splitters = get_mood_splitters(train_val_dataset.smiles, 1, study.best_trial.user_attrs["trial_seed"], n_jobs=-1)
+    random_state = study.best_trial.user_attrs["trial_seed"]
+    splitters = get_mood_splitters(train_val_dataset.smiles, 1, random_state, n_jobs=-1)
     train_val_splitter = splitters[train_val_split]
     train_ind, val_ind = next(train_val_splitter.split(train_val_dataset.X))
 
-    train_dataset, val_dataset, scaler = rct_dataset_setup(
+    train_dataset, val_dataset, test_dataset = rct_dataset_setup(
         train_val_dataset, train_ind, val_ind, test_dataset, is_regression
     )
     model = train(
@@ -337,7 +348,7 @@ def tune_cmd(
         algorithm=algorithm,
         is_regression=is_regression,
         params=study.best_params,
-        seed=seed,
+        seed=random_state,
         calibrate=False,
         ensemble_size=5
     )
