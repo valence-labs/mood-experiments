@@ -24,7 +24,7 @@ def weighted_spearman(preds, target, sample_weights=None):
     """
     if sample_weights is None:
         # If not sample weights are provided, just rely on TorchMetrics' implementation
-        return spearman_corrcoef(preds, target)
+        return spearman_corrcoef(preds=preds, target=target)
 
     def _weighted_mean(x, w):
         return torch.sum(w * x) / torch.sum(w)
@@ -66,7 +66,7 @@ def weighted_mae(preds, target, sample_weights=None):
 def weighted_brier_score(target, uncertainty, sample_weights=None):
     confidence = torch.stack([unc[tar] for unc, tar in zip(uncertainty, target)])
     if sample_weights is None:
-        return mean_squared_error(confidence, target)
+        return mean_squared_error(preds=confidence, target=target)
     summed_mse = torch.square(sample_weights * (confidence - target)).sum()
     brier_score = summed_mse / torch.sum(sample_weights)
     return brier_score
@@ -74,7 +74,7 @@ def weighted_brier_score(target, uncertainty, sample_weights=None):
 
 def weighted_auroc(preds, target, sample_weights=None):
     if sample_weights is None:
-        return binary_auroc(preds, target)
+        return binary_auroc(preds=preds, target=target)
 
     # TorchMetrics does not actually support sample weights, so we rely on the sklearn implementation
     preds = preds.cpu().numpy()
@@ -145,7 +145,7 @@ class Metric:
                 needs_predictions=True,
                 needs_uncertainty=False,
                 range_min=0,
-                range_max=None
+                range_max=None,
             )
         elif name == "Spearman":
             return cls(
@@ -191,10 +191,11 @@ class Metric:
         kwargs = self.to_kwargs(y_true, y_pred, uncertainty, sample_weights)
         return self.fn_(**kwargs).item()
 
-    def preprocess_targets(self, y_true):
+    @staticmethod
+    def preprocess_targets(y_true, is_regression: bool):
         if not isinstance(y_true, torch.Tensor):
             y_true = torch.tensor(y_true)
-        if self.target_type.is_regression():
+        if is_regression:
             y_true = y_true.float().squeeze()
             if y_true.ndim == 0:
                 y_true = y_true.unsqueeze(0)
@@ -227,7 +228,7 @@ class Metric:
         return self.range_min, self.range_max
 
     def to_kwargs(self, y_true, y_pred, uncertainty, sample_weights):
-        kwargs = {"target": self.preprocess_targets(y_true)}
+        kwargs = {"target": self.preprocess_targets(y_true, self.target_type.is_regression())}
         kwargs["sample_weights"] = self.preprocess_sample_weights(sample_weights, kwargs["target"].device)
         if self.needs_predictions:
             kwargs["preds"] = self.preprocess_predictions(y_pred, kwargs["target"].device)

@@ -165,17 +165,7 @@ class Mixup(BaseModel):
 
     @staticmethod
     def suggest_params(trial):
-
-        # Copied from the BaseModel because I wanted to lower the upper bound for the learning rate
-        # With a too high learning rate, Mixup kept having NaN values.
-
-        width = trial.suggest_categorical("mlp_width", [64, 128, 256, 512])
-        depth = trial.suggest_int("mlp_depth", 1, 5)
-        lr = trial.suggest_float("lr", 1e-8, 1e-3, log=True)
-        weight_decay = trial.suggest_categorical(
-            "weight_decay", ["auto", 0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0]
-        )
-        params = {"mlp_width": width, "mlp_depth": depth, "lr": lr, "weight_decay": weight_decay}
+        params = BaseModel.suggest_params(trial)
         params["penalty_weight"] = trial.suggest_float("penalty_weight", 0.0001, 100, log=True)
         params["penalty_weight_schedule"] = trial.suggest_categorical(
             "penalty_weight_schedule", [[0, 25], [0, 50], [0, 0], [25, 50]]

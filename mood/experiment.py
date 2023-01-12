@@ -13,6 +13,12 @@ from loguru import logger
 from sklearn.base import BaseEstimator
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
+from torchmetrics.functional.regression import (
+    r2_score,
+    spearman_corrcoef,
+    pearson_corrcoef,
+    mean_absolute_error,
+)
 
 from mood.baselines import suggest_baseline_hparams, predict_baseline_uncertainty
 from mood.constants import RESULTS_DIR, BATCH_SIZE
@@ -53,7 +59,7 @@ def run_study(metric, algorithm, n_startup_trials, n_trials, trial_fn, seed):
         # NOTE: This is not robust (as other RunTimeErrors could be thrown)
         #  but is an easy, performant way to check for NaN values which often
         #  occurred for Mixup due to high losses on the first few batches
-        catch = (RuntimeError, )
+        catch = (RuntimeError,)
     else:
         catch = ()
 
@@ -146,6 +152,84 @@ def rct_predict_step(model, dataset):
     return y_pred, uncertainty
 
 
+def rct_compute_metrics(
+    y_true, y_pred, y_uncertainty, performance_metric, calibration_metric, is_regression, prefix, suffix
+):
+
+    prf_score = performance_metric(y_true, y_pred)
+
+    # NOTE: Ideally we would always compute the calibration metric,
+    #  but that was too computationally expensive due to the need of ensembles
+    if y_uncertainty is not None:
+        cal_score = calibration_metric(y_true, y_pred, y_uncertainty)
+    else:
+        cal_score = None
+
+    ret = {
+        f"{prefix}_calibration_{calibration_metric.name}_{suffix}": cal_score,
+        f"{prefix}_performance_{performance_metric.name}_{suffix}": prf_score,
+    }
+
+    if is_regression:
+
+        targets = Metric.preprocess_targets(y_true, is_regression)
+        predictions = Metric.preprocess_predictions(y_pred, targets.device)
+
+        # NOTE: Before starting the RCT, we were not sure what metric to use
+        #   to compare models for regression tasks, that's why we compute some extra here
+        ret[f"{prefix}_extra_r2_{suffix}"] = r2_score(preds=predictions, target=targets).item()
+        ret[f"{prefix}_extra_spearman_{suffix}"] = spearman_corrcoef(preds=predictions, target=targets).item()
+        ret[f"{prefix}_extra_pearson_{suffix}"] = pearson_corrcoef(preds=predictions, target=targets).item()
+        ret[f"{prefix}_extra_mae_{suffix}"] = mean_absolute_error(preds=predictions, target=targets).item()
+
+    return ret
+
+
+def rct_evaluate_step(
+    model,
+    train_dataset,
+    val_dataset,
+    test_dataset,
+    performance_metric,
+    calibration_metric,
+    is_regression,
+    suffix,
+    criterion: Optional = None,
+):
+
+    val_y_pred, val_uncertainty = rct_predict_step(model, val_dataset)
+    val_metrics = rct_compute_metrics(
+        y_true=val_dataset.y,
+        y_pred=val_y_pred,
+        y_uncertainty=val_uncertainty,
+        performance_metric=performance_metric,
+        calibration_metric=calibration_metric,
+        is_regression=is_regression,
+        prefix="val",
+        suffix=suffix,
+    )
+
+    test_y_pred, test_uncertainty = rct_predict_step(model, test_dataset)
+    test_metrics = rct_compute_metrics(
+        y_true=test_dataset.y,
+        y_pred=test_y_pred,
+        y_uncertainty=test_uncertainty,
+        performance_metric=performance_metric,
+        calibration_metric=calibration_metric,
+        is_regression=is_regression,
+        prefix="test",
+        suffix=suffix,
+    )
+
+    # Update the criterion used to select which model is based
+    if criterion is not None:
+        criterion.update(val_y_pred, val_uncertainty, train_dataset, val_dataset)
+
+    metrics = val_metrics
+    metrics.update(test_metrics)
+    return metrics
+
+
 def rct_tuning_loop(
     train_val_dataset: SimpleMolecularDataset,
     test_dataset: SimpleMolecularDataset,
@@ -198,31 +282,25 @@ def rct_tuning_loop(
                 calibrate=False,
                 # NOTE: If we do not select models based on uncertainty,
                 #  we don't train an ensemble to reduce computational cost
-                ensemble_size=5 if criterion.needs_uncertainty else 1
+                ensemble_size=5 if criterion.needs_uncertainty else 1,
             )
 
-            val_y_pred, val_uncertainty = rct_predict_step(model, val_dataset)
-            val_prf_score = performance_metric(val_dataset.y, val_y_pred)
-
-            test_y_pred, test_uncertainty = rct_predict_step(model, test_dataset_inner)
-            test_prf_score = performance_metric(test_dataset_inner.y, test_y_pred)
-
-            # NOTE: Ideally we would do this always for calibration, but that was too computationally expensive
-            if test_uncertainty is not None and val_uncertainty is not None:
-                test_cal_score = calibration_metric(test_dataset_inner.y, test_y_pred, test_uncertainty)
-                val_cal_score = calibration_metric(val_dataset.y, val_y_pred, val_uncertainty)
-            else:
-                val_cal_score = None
-                test_cal_score = None
+            metrics = rct_evaluate_step(
+                model=model,
+                train_dataset=train_dataset,
+                val_dataset=val_dataset,
+                test_dataset=test_dataset_inner,
+                performance_metric=performance_metric,
+                calibration_metric=calibration_metric,
+                is_regression=is_regression,
+                suffix=str(split_idx),
+                criterion=criterion,
+            )
 
             # We save the val and test performance for each trial to analyze the success
             # of the model selection procedure (gap between best and selected model)
-            trial.set_user_attr(f"val_performance_{split_idx}", val_prf_score)
-            trial.set_user_attr(f"test_performance_{split_idx}", test_prf_score)
-            trial.set_user_attr(f"val_calibration_{split_idx}", val_cal_score)
-            trial.set_user_attr(f"test_calibration_{split_idx}", test_cal_score)
-
-            criterion.update(val_y_pred, val_uncertainty, train_dataset, val_dataset)
+            for k, v in metrics.items():
+                trial.set_user_attr(k, v)
 
         return criterion.critique()
 
@@ -268,7 +346,9 @@ def tune_cmd(
     dm.fs.mkdir(csv_out_dir, exist_ok=True)
 
     yaml_out_dir = dm.fs.join(base_save_dir, "YAML", "RCT", sub_save_dir)
-    yaml_fname = f"rct_selected_model_{dataset}_{algorithm}_{representation}_{train_val_split}_{criterion}_{seed}.yaml"
+    yaml_fname = (
+        f"rct_selected_model_{dataset}_{algorithm}_{representation}_{train_val_split}_{criterion}_{seed}.yaml"
+    )
     yaml_path = dm.fs.join(yaml_out_dir, yaml_fname)
     dm.fs.mkdir(yaml_out_dir, exist_ok=True)
 
@@ -331,7 +411,7 @@ def tune_cmd(
     # Train the best model found again, but this time as an ensemble
     # to evaluate the test performance and calibration
 
-    # NOTE: Some methods are really sensitive to hyper-parameters (e.g. GPs)
+    # NOTE: Some methods are really sensitive to hyper-parameters (e.g. GPs, Mixup)
     #  So with a different train-val split, these might no longer succeed to train.
     random_state = study.best_trial.user_attrs["trial_seed"]
     splitters = get_mood_splitters(train_val_dataset.smiles, 1, random_state, n_jobs=-1)
@@ -350,16 +430,19 @@ def tune_cmd(
         params=study.best_params,
         seed=random_state,
         calibrate=False,
-        ensemble_size=5
+        ensemble_size=5,
     )
 
-    test_y_pred, test_uncertainties = rct_predict_step(model, test_dataset)
-    test_prf_score = performance_metric(test_dataset.y, test_y_pred)
-    test_cal_score = calibration_metric(test_dataset.y, test_y_pred, test_uncertainties)
-
-    val_y_pred, val_uncertainties = rct_predict_step(model, val_dataset)
-    val_prf_score = performance_metric(val_dataset.y, val_y_pred)
-    val_cal_score = calibration_metric(val_dataset.y, val_y_pred, val_uncertainties)
+    metrics = rct_evaluate_step(
+        model=model,
+        train_dataset=train_dataset,
+        val_dataset=val_dataset,
+        test_dataset=test_dataset,
+        performance_metric=performance_metric,
+        calibration_metric=calibration_metric,
+        is_regression=is_regression,
+        suffix="final",
+    )
 
     # Save the full trial results as a CSV
     logger.info(f"Saving the full study data to {csv_path}")
@@ -376,18 +459,16 @@ def tune_cmd(
     data = {
         "hparams": study.best_params,
         "criterion_final": study.best_value,
-        "test_performance_final": test_prf_score,
-        "val_performance_final": val_prf_score,
-        "test_calibration_final": test_cal_score,
-        "val_calibration_final": val_cal_score,
         "dataset": dataset,
         "algorithm": algorithm,
         "representation": representation,
         "train_val_split": train_val_split,
         "criterion": criterion,
         "seed": seed,
-        **study.best_trial.user_attrs
+        **study.best_trial.user_attrs,
+        **metrics,
     }
+
     logger.info(f"Saving the data of the best model to {yaml_path}")
     with fsspec.open(yaml_path, "w") as fd:
         yaml.dump(data, fd)

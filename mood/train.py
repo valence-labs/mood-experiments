@@ -81,7 +81,9 @@ def train_torch_model(
     for i in range(ensemble_size):
 
         base = get_simple_mlp(len(train_dataset.X[0]), width, depth, out_size=None)
-        head = get_simple_mlp(input_size=width * 2 if algorithm == "MTL" else width, is_regression=is_regression)
+        head = get_simple_mlp(
+            input_size=width * 2 if algorithm == "MTL" else width, is_regression=is_regression
+        )
 
         model = MOOD_ALGORITHMS[algorithm](
             base_network=base,
@@ -114,6 +116,9 @@ def train_torch_model(
             )
             val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, num_workers=no_workers)
 
+        # NOTE: For smaller dataset, moving data between and CPU and GPU will be the bottleneck
+        use_gpu = torch.cuda.is_available() and len(train_dataset) > 2500
+
         callbacks = [EarlyStopping("val_loss", patience=10, mode="min")]
         trainer = Trainer(
             max_epochs=NUM_EPOCHS,
@@ -123,6 +128,8 @@ def train_torch_model(
             enable_progress_bar=False,
             num_sanity_val_steps=0,
             logger=False,
+            accelerator="gpu" if use_gpu else None,
+            devices=1 if use_gpu else None,
             enable_checkpointing=False,
         )
         trainer.fit(model, train_dataloader, val_dataloader)
