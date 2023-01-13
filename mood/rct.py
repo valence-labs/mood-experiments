@@ -3,7 +3,7 @@ import zlib
 
 import numpy as np
 
-from mood.model import MOOD_ALGORITHMS
+from mood.model import MOOD_DA_DG_ALGORITHMS
 from mood.representations import MOOD_REPRESENTATIONS
 from mood.splitter import MOOD_SPLITTERS
 from mood.baselines import MOOD_BASELINES
@@ -23,6 +23,9 @@ def get_experimental_configurations(dataset):
     biasing the experiment.
     """
 
+    # NOTE: Despite adding more convenient ways of getting all algorithms and criteria,
+    #  using this would change the ordering of the RCT, which is why we kept the more clunky code.
+
     prf_metric = Metric.get_default_performance_metric(dataset)
     cal_metric = Metric.get_default_calibration_metric(dataset)
 
@@ -30,7 +33,7 @@ def get_experimental_configurations(dataset):
 
     mood_baselines = MOOD_BASELINES.copy()
     mood_baselines.pop(mood_baselines.index("MLP"))
-    mood_algorithms = mood_baselines + list(MOOD_ALGORITHMS.keys())
+    mood_algorithms = mood_baselines + list(MOOD_DA_DG_ALGORITHMS.keys())
 
     all_options = list(
         itertools.product(

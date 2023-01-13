@@ -7,6 +7,15 @@ from mood.distance import compute_knn_distance, get_distance_metric
 from mood.metrics import Metric
 
 
+MOOD_CRITERIA = [
+    "Performance",
+    "Domain Weighted Performance",
+    "Distance Weighted Performance",
+    "Calibration",
+    "Calibration x Performance"
+]
+
+
 def get_mood_criteria(performance_metric, calibration_metric):
     """Endpoint for easily creating a criterion by name"""
 

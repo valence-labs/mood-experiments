@@ -22,7 +22,7 @@ from torchmetrics.functional.regression import (
 
 from mood.baselines import suggest_baseline_hparams, predict_baseline_uncertainty
 from mood.constants import RESULTS_DIR, BATCH_SIZE
-from mood.model import MOOD_ALGORITHMS, needs_domain_representation, is_domain_generalization
+from mood.model import MOOD_DA_DG_ALGORITHMS, needs_domain_representation, is_domain_generalization
 from mood.model.base import Ensemble
 from mood.train import train_baseline_model, train
 from mood.criteria import get_mood_criteria
@@ -266,8 +266,8 @@ def rct_tuning_loop(
                 train_val_dataset, train_ind, val_ind, test_dataset, is_regression
             )
 
-            if algorithm in MOOD_ALGORITHMS:
-                params = MOOD_ALGORITHMS[algorithm].suggest_params(trial)
+            if algorithm in MOOD_DA_DG_ALGORITHMS:
+                params = MOOD_DA_DG_ALGORITHMS[algorithm].suggest_params(trial)
             else:
                 params = suggest_baseline_hparams(algorithm, is_regression, trial)
 

@@ -12,7 +12,7 @@ from mood.model.erm import ERM
 from mood.model.mtl import MTL
 
 
-MOOD_ALGORITHMS = {
+MOOD_DA_DG_ALGORITHMS = {
     "VREx": VREx,
     "CORAL": CORAL,
     "DANN": DANN,
@@ -22,10 +22,22 @@ MOOD_ALGORITHMS = {
     "MTL": MTL,
 }
 
+MOOD_ALGORITHMS = [
+    "RF",
+    "GP",
+    "MLP",
+    "MTL",
+    "VREx",
+    "IB-ERM",
+    "CORAL",
+    "DANN",
+    "Mixup"
+]
+
 
 def _get_type(model: Union[BaseEstimator, BaseModel, str]):
     if isinstance(model, str):
-        model_type = MOOD_ALGORITHMS.get(model)
+        model_type = MOOD_DA_DG_ALGORITHMS.get(model)
     else:
         model_type = type(model)
     if not (model_type is None or issubclass(model_type, BaseEstimator) or issubclass(model_type, BaseModel)):

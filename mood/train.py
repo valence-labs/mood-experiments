@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from mood.baselines import construct_kernel, get_baseline_model, MOOD_BASELINES
 from mood.constants import BATCH_SIZE, NUM_EPOCHS
 from mood.dataset import SimpleMolecularDataset, DAMolecularDataset, domain_based_collate
-from mood.model import MOOD_ALGORITHMS, is_domain_generalization, is_domain_adaptation
+from mood.model import MOOD_DA_DG_ALGORITHMS, is_domain_generalization, is_domain_adaptation
 from mood.model.base import Ensemble
 from mood.model.nn import get_simple_mlp
 
@@ -85,7 +85,7 @@ def train_torch_model(
             input_size=width * 2 if algorithm == "MTL" else width, is_regression=is_regression
         )
 
-        model = MOOD_ALGORITHMS[algorithm](
+        model = MOOD_DA_DG_ALGORITHMS[algorithm](
             base_network=base,
             prediction_head=head,
             loss_fn=torch.nn.MSELoss() if is_regression else torch.nn.BCELoss(),
@@ -152,7 +152,7 @@ def train(
     # NOTE: The order here matters since there are two MLP implementations
     #  In this case, we want to use the torch implementation.
 
-    if algorithm in MOOD_ALGORITHMS:
+    if algorithm in MOOD_DA_DG_ALGORITHMS:
 
         if calibrate:
             raise NotImplementedError("We only support calibration for scikit-learn models")
