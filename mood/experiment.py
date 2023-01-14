@@ -1,4 +1,3 @@
-import torch
 import yaml
 import fsspec
 import optuna
@@ -267,7 +266,7 @@ def rct_tuning_loop(
 
             # NOTE: AUROC is not defined when there's just a single ground truth class.
             #   Since this only happens for the unbalanced and small HIA dataset, we just skip.
-            if performance_metric.name == "AUROC" and len(torch.unique(val_dataset.y)) == 1:
+            if performance_metric.name == "AUROC" and len(np.unique(val_dataset.y)) == 1:
                 continue
 
             if algorithm in MOOD_DA_DG_ALGORITHMS:
