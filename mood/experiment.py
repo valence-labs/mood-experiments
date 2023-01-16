@@ -1,14 +1,12 @@
-from copy import deepcopy
-
+import yaml
 import fsspec
 import optuna
 import numpy as np
 import datamol as dm
 
+from copy import deepcopy
 from datetime import datetime
 from typing import Optional
-
-import yaml
 from loguru import logger
 from sklearn.base import BaseEstimator
 from sklearn.preprocessing import StandardScaler
@@ -265,6 +263,11 @@ def rct_tuning_loop(
             train_dataset, val_dataset, test_dataset_inner = rct_dataset_setup(
                 train_val_dataset, train_ind, val_ind, test_dataset, is_regression
             )
+
+            # NOTE: AUROC is not defined when there's just a single ground truth class.
+            #   Since this only happens for the unbalanced and small HIA dataset, we just skip.
+            if performance_metric.name == "AUROC" and len(np.unique(val_dataset.y)) == 1:
+                continue
 
             if algorithm in MOOD_DA_DG_ALGORITHMS:
                 params = MOOD_DA_DG_ALGORITHMS[algorithm].suggest_params(trial)
