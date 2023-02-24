@@ -7,24 +7,20 @@ from typing import Callable, Optional
 from sklearn.metrics import roc_auc_score
 from torchmetrics.functional import mean_absolute_error, mean_squared_error
 from torchmetrics.functional.classification import binary_auroc
-from torchmetrics.functional.regression.spearman import (
-    _spearman_corrcoef_update,
-    spearman_corrcoef,
-    _rank_data,
-)
+from torchmetrics.functional.regression.pearson import pearson_corrcoef
 from torchmetrics.wrappers.bootstrapping import _bootstrap_sampler
 
 from mood.dataset import MOOD_REGR_DATASETS
 
 
-def weighted_spearman(preds, target, sample_weights=None):
+def weighted_pearson(preds, target, sample_weights=None):
     """
-    The weighted Spearman correlation efficient. Based on:
-     https://en.m.wikipedia.org/wiki/Pearson_correlation_coefficient#Weighted_correlation_coefficient
+    The weighted Pearson correlation efficient. Based on:
+     https://stats.stackexchange.com/a/222107
     """
     if sample_weights is None:
         # If not sample weights are provided, just rely on TorchMetrics' implementation
-        return spearman_corrcoef(preds=preds, target=target)
+        return pearson_corrcoef(preds=preds, target=target)
 
     def _weighted_mean(x, w):
         return torch.sum(w * x) / torch.sum(w)
@@ -33,11 +29,6 @@ def weighted_spearman(preds, target, sample_weights=None):
     # 1) Instead of computing the mean, compute the weighted mean
     # 2) Computing the weighted covariance
     # 3) Computing the weighted correlation
-    num_outputs = 1 if preds.ndim == 1 else preds.shape[-1]
-    preds, target = _spearman_corrcoef_update(preds, target, num_outputs)
-
-    preds = _rank_data(preds)
-    target = _rank_data(target)
 
     preds_diff = preds - _weighted_mean(preds, sample_weights)
     target_diff = target - _weighted_mean(target, sample_weights)
@@ -51,9 +42,9 @@ def weighted_spearman(preds, target, sample_weights=None):
     return torch.clamp(corrcoef, -1.0, 1.0)
 
 
-def weighted_spearman_calibration(preds, target, uncertainty, sample_weights=None):
+def weighted_pearson_calibration(preds, target, uncertainty, sample_weights=None):
     error = torch.abs(preds - target)
-    return weighted_spearman(error, uncertainty, sample_weights)
+    return weighted_pearson(error, uncertainty, sample_weights)
 
 
 def weighted_mae(preds, target, sample_weights=None):
@@ -120,7 +111,7 @@ class Metric:
     def get_default_calibration_metric(cls, dataset):
         is_regression = dataset in MOOD_REGR_DATASETS
         if is_regression:
-            metric = cls.by_name("Spearman")
+            metric = cls.by_name("Pearson")
         else:
             metric = cls.by_name("Brier score")
         return metric
@@ -147,10 +138,10 @@ class Metric:
                 range_min=0,
                 range_max=None,
             )
-        elif name == "Spearman":
+        elif name == "Pearson":
             return cls(
-                name="Spearman",
-                fn=weighted_spearman_calibration,
+                name="Pearson",
+                fn=weighted_pearson_calibration,
                 mode="max",
                 target_type=TargetType.REGRESSION,
                 needs_predictions=True,

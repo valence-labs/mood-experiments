@@ -1,12 +1,10 @@
 import logging
-import random
-import numpy as np
 import torch
 
 from typing import Optional
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
-from lightning_lite.utilities.seed import seed_everything
+from pytorch_lightning.utilities.seed import seed_everything
 from torch.utils.data import DataLoader
 
 from mood.baselines import construct_kernel, get_baseline_model, MOOD_BASELINES

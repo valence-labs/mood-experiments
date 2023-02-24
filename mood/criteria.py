@@ -1,4 +1,5 @@
 import abc
+from typing import Sequence
 
 import numpy as np
 
@@ -59,7 +60,18 @@ class ModelSelectionCriterion(abc.ABC):
 
     def critique(self):
         """Aggregates the scores of individual iterations."""
-        score = np.mean(self.scores)
+        if len(self.scores) == 0:
+            raise RuntimeError("Cannot critique when no scores have been computed yet")
+
+        if isinstance(self.scores[0], Sequence):
+            lengths = set(len(s) for s in self.scores)
+            if len(lengths) != 1:
+                raise RuntimeError("All scores need to have the same number of dimensions")
+            n = lengths.pop()
+            return list(np.mean([s[i] for s in self.scores]) for i in range(n))
+        else:
+            score = np.mean(self.scores)
+
         self.reset()
         return score
 
@@ -121,27 +133,11 @@ class CombinedCriterion(ModelSelectionCriterion):
     the performance score by the calibration score"""
 
     def __init__(self, performance_metric: Metric, calibration_metric: Metric):
-        super().__init__(mode=performance_metric.mode, needs_uncertainty=True)
-
-        vmin, vmax = calibration_metric.range
-        if vmin is None or vmax is None:
-            raise ValueError(f"{calibration_metric.name} cannot be used with {type(self).__name__}")
-
+        super().__init__(mode=[performance_metric.mode, calibration_metric.mode], needs_uncertainty=True)
         self.performance_criterion = PerformanceCriterion(performance_metric)
         self.calibration_criterion = CalibrationCriterion(calibration_metric)
 
     def score(self, predictions, uncertainties, train: SimpleMolecularDataset, val: SimpleMolecularDataset):
         prf_score = self.performance_criterion.score(predictions, uncertainties, train, val)
         cal_score = self.calibration_criterion.score(predictions, uncertainties, train, val)
-
-        # Normalize to [0, 1]
-        vmin, vmax = self.calibration_criterion.metric.range
-        cal_score = (cal_score + abs(vmin)) / (vmax - vmin)
-
-        # Since the calibration score is between 0 and 1,
-        if self.mode == "min":
-            score = prf_score / cal_score
-        else:
-            score = prf_score * cal_score
-
-        return score
+        return prf_score, cal_score

@@ -6,7 +6,7 @@ import datamol as dm
 
 from copy import deepcopy
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Sequence
 from loguru import logger
 from sklearn.base import BaseEstimator
 from sklearn.preprocessing import StandardScaler
@@ -42,10 +42,14 @@ from mood.rct import get_experimental_configurations
 def run_study(metric, algorithm, n_startup_trials, n_trials, trial_fn, seed):
     """Endpoint for running an Optuna study"""
 
-    direction = "maximize" if metric.mode == "max" else "minimize"
     sampler = optuna.samplers.TPESampler(seed=seed, n_startup_trials=n_startup_trials)
 
-    study = optuna.create_study(direction=direction, sampler=sampler)
+    if isinstance(metric.mode, list):
+        directions = ["maximize" if m == "max" else "minimize" for m in metric.mode]
+        study = optuna.create_study(directions=directions, sampler=sampler)
+    else:
+        direction = "maximize" if metric.mode == "max" else "minimize"
+        study = optuna.create_study(direction=direction, sampler=sampler)
 
     if algorithm == "GP":
         # ValueError: array must not contain infs or NaNs
@@ -413,10 +417,16 @@ def tune_cmd(
 
     # Train the best model found again, but this time as an ensemble
     # to evaluate the test performance and calibration
+    if len(study.directions) > 1:
+        logger.info(f"There's {len(study.best_trials)} models on the Pareto front. Picking one randomly!")
+        rng = np.random.default_rng(seed)
+        best_trial = rng.choice(study.best_trials)
+    else:
+        best_trial = study.best_trial
 
     # NOTE: Some methods are really sensitive to hyper-parameters (e.g. GPs, Mixup)
     #  So with a different train-val split, these might no longer succeed to train.
-    random_state = study.best_trial.user_attrs["trial_seed"]
+    random_state = best_trial.user_attrs["trial_seed"]
     splitters = get_mood_splitters(train_val_dataset.smiles, 1, random_state, n_jobs=-1)
     train_val_splitter = splitters[train_val_split]
     train_ind, val_ind = next(train_val_splitter.split(train_val_dataset.X))
@@ -430,7 +440,7 @@ def tune_cmd(
         test_dataset=test_dataset,
         algorithm=algorithm,
         is_regression=is_regression,
-        params=study.best_params,
+        params=best_trial.params,
         seed=random_state,
         calibrate=False,
         ensemble_size=5,
@@ -460,15 +470,15 @@ def tune_cmd(
 
     # Save the most important information as YAML (higher precision)
     data = {
-        "hparams": study.best_params,
-        "criterion_final": study.best_value,
+        "hparams": best_trial.params,
+        "criterion_final": best_trial.values,
         "dataset": dataset,
         "algorithm": algorithm,
         "representation": representation,
         "train_val_split": train_val_split,
         "criterion": criterion,
         "seed": seed,
-        **study.best_trial.user_attrs,
+        **best_trial.user_attrs,
         **metrics,
     }
 
