@@ -27,8 +27,6 @@ Where data related to specific datasets is saved
 """
 DATASET_DATA_DIR = "gs://experiments-output/mood-v2/datasets/"
 
-"""The batch size to use during training"""
-BATCH_SIZE = 256
 
 """The number of epochs to train NNs for"""
 NUM_EPOCHS = 100

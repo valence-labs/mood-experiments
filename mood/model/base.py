@@ -84,10 +84,11 @@ class BaseModel(LightningModule, abc.ABC):
         width = trial.suggest_categorical("mlp_width", [64, 128, 256, 512])
         depth = trial.suggest_int("mlp_depth", 1, 5)
         lr = trial.suggest_float("lr", 1e-8, 1e-1, log=True)
+        batch_size = trial.suggest_categorical("batch_size", [32, 64, 128, 256])
         weight_decay = trial.suggest_categorical(
             "weight_decay", ["auto", 0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0]
         )
-        return {"mlp_width": width, "mlp_depth": depth, "lr": lr, "weight_decay": weight_decay}
+        return {"mlp_width": width, "mlp_depth": depth, "lr": lr, "weight_decay": weight_decay, "batch_size": batch_size}
 
 
 class Ensemble(LightningModule):
