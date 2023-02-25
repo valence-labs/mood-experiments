@@ -146,7 +146,7 @@ def rct_predict_step(model, dataset):
         uncertainty = predict_baseline_uncertainty(model, dataset.X)
     elif isinstance(model, Ensemble):
         collate_fn = domain_based_inference_collate if is_domain_generalization(model.models[0]) else None
-        dataloader = DataLoader(dataset, collate_fn=collate_fn, batch_size=BATCH_SIZE)
+        dataloader = DataLoader(dataset, collate_fn=collate_fn, batch_size=model.models[0].batch_size)
         y_pred = model.predict(dataloader)
         uncertainty = model.predict_uncertainty(dataloader)
     else:

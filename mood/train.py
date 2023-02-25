@@ -88,7 +88,6 @@ def train_torch_model(
             base_network=base,
             prediction_head=head,
             loss_fn=torch.nn.MSELoss() if is_regression else torch.nn.BCELoss(),
-            batch_size=batch_size,
             **params,
         )
 
