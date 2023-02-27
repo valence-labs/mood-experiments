@@ -8,7 +8,7 @@ from pytorch_lightning.utilities.seed import seed_everything
 from torch.utils.data import DataLoader
 
 from mood.baselines import construct_kernel, get_baseline_model, MOOD_BASELINES
-from mood.constants import BATCH_SIZE, NUM_EPOCHS
+from mood.constants import NUM_EPOCHS
 from mood.dataset import SimpleMolecularDataset, DAMolecularDataset, domain_based_collate
 from mood.model import MOOD_DA_DG_ALGORITHMS, is_domain_generalization, is_domain_adaptation
 from mood.model.base import Ensemble
@@ -69,6 +69,7 @@ def train_torch_model(
 
     width = params.pop("mlp_width")
     depth = params.pop("mlp_depth")
+    batch_size = params["batch_size"]
 
     # NOTE: Since the datasets are all very small,
     #   setting up and syncing the threads takes longer than
@@ -87,32 +88,31 @@ def train_torch_model(
             base_network=base,
             prediction_head=head,
             loss_fn=torch.nn.MSELoss() if is_regression else torch.nn.BCELoss(),
-            batch_size=BATCH_SIZE,
             **params,
         )
 
         if is_domain_adaptation(model):
             train_dataset_da = DAMolecularDataset(source_dataset=train_dataset, target_dataset=test_dataset)
             train_dataloader = DataLoader(
-                train_dataset_da, batch_size=BATCH_SIZE, shuffle=True, num_workers=no_workers
+                train_dataset_da, batch_size=batch_size, shuffle=True, num_workers=no_workers
             )
-            val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, num_workers=no_workers)
+            val_dataloader = DataLoader(val_dataset, batch_size=batch_size, num_workers=no_workers)
         elif is_domain_generalization(model):
             train_dataloader = DataLoader(
                 train_dataset,
-                batch_size=BATCH_SIZE,
+                batch_size=batch_size,
                 shuffle=True,
                 collate_fn=domain_based_collate,
                 num_workers=no_workers,
             )
             val_dataloader = DataLoader(
-                val_dataset, batch_size=BATCH_SIZE, collate_fn=domain_based_collate, num_workers=no_workers
+                val_dataset, batch_size=batch_size, collate_fn=domain_based_collate, num_workers=no_workers
             )
         else:
             train_dataloader = DataLoader(
-                train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=no_workers
+                train_dataset, batch_size=batch_size, shuffle=True, num_workers=no_workers
             )
-            val_dataloader = DataLoader(val_dataset, batch_size=BATCH_SIZE, num_workers=no_workers)
+            val_dataloader = DataLoader(val_dataset, batch_size=batch_size, num_workers=no_workers)
 
         # NOTE: For smaller dataset, moving data between and CPU and GPU will be the bottleneck
         use_gpu = torch.cuda.is_available() and len(train_dataset) > 2500

@@ -104,12 +104,14 @@ def suggest_mlp_hparams(trial, is_regression):
     lr = trial.suggest_float("learning_rate_init", 1e-7, 1e0, log=True)
     alpha = trial.suggest_float("alpha", 1e-10, 1e0, log=True)
     max_iter = trial.suggest_int("max_iter", 1, 300)
+    batch_size = trial.suggest_categorical("batch_size", [32, 64, 128, 256])
 
     return {
         "max_iter": max_iter,
         "alpha": alpha,
         "learning_rate_init": lr,
         "hidden_layer_sizes": arch,
+        "batch_size": batch_size,
     }
 
 
