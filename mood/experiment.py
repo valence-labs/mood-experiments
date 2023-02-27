@@ -6,7 +6,7 @@ import datamol as dm
 
 from copy import deepcopy
 from datetime import datetime
-from typing import Optional, Sequence
+from typing import Optional
 from loguru import logger
 from sklearn.base import BaseEstimator
 from sklearn.preprocessing import StandardScaler

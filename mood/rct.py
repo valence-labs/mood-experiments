@@ -23,8 +23,10 @@ def get_experimental_configurations(dataset):
     biasing the experiment.
     """
 
-    # NOTE: Despite adding more convenient ways of getting all algorithms and criteria,
-    #  using this would change the ordering of the RCT, which is why we kept the more clunky code.
+    # NOTE: We should not rely on the order of a dict for creating these configurations,
+    #  as a dict is not ordered. We unfortunately only realized this halfway through generating the results.
+    #  Luckily, it seems like for our use case this does result in consistent results.
+    #  As updating the code would change the ordering of the RCT, we kept it like this for now .
 
     prf_metric = Metric.get_default_performance_metric(dataset)
     cal_metric = Metric.get_default_calibration_metric(dataset)

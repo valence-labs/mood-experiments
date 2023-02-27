@@ -13,7 +13,7 @@ MOOD_CRITERIA = [
     "Domain Weighted Performance",
     "Distance Weighted Performance",
     "Calibration",
-    "Calibration x Performance"
+    "Calibration x Performance",
 ]
 
 

@@ -22,17 +22,7 @@ MOOD_DA_DG_ALGORITHMS = {
     "MTL": MTL,
 }
 
-MOOD_ALGORITHMS = [
-    "RF",
-    "GP",
-    "MLP",
-    "MTL",
-    "VREx",
-    "IB-ERM",
-    "CORAL",
-    "DANN",
-    "Mixup"
-]
+MOOD_ALGORITHMS = ["RF", "GP", "MLP", "MTL", "VREx", "IB-ERM", "CORAL", "DANN", "Mixup"]
 
 
 def _get_type(model: Union[BaseEstimator, BaseModel, str]):

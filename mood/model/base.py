@@ -88,7 +88,13 @@ class BaseModel(LightningModule, abc.ABC):
         weight_decay = trial.suggest_categorical(
             "weight_decay", ["auto", 0.0, 0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1, 1.0]
         )
-        return {"mlp_width": width, "mlp_depth": depth, "lr": lr, "weight_decay": weight_decay, "batch_size": batch_size}
+        return {
+            "mlp_width": width,
+            "mlp_depth": depth,
+            "lr": lr,
+            "weight_decay": weight_decay,
+            "batch_size": batch_size,
+        }
 
 
 class Ensemble(LightningModule):
