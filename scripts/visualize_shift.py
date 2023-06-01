@@ -30,7 +30,6 @@ def cli(
     optimization = load_representation_for_downstream_application("optimization", representation)
 
     if model_space is not None:
-
         logger.info(f"Computing distance in the {model_space} model space")
         is_regression = dataset in MOOD_REGR_DATASETS
         model = train_baseline_model(X, y, model_space, is_regression)

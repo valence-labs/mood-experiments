@@ -18,7 +18,6 @@ def is_linear_kernel(kernel):
 
 
 class ModelSpaceTransformer:
-
     SUPPORTED_TYPES = Union[
         _SKLEARN_MLP_TYPE,
         _SKLEARN_RF_TYPE,

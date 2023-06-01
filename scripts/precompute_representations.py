@@ -18,7 +18,6 @@ def cli(
     verbose: bool = False,
     override: bool = False,
 ):
-
     if molecule_set not in SUPPORTED_DOWNSTREAM_APPS:
         raise typer.BadParameter(f"--molecule-set should be one of {SUPPORTED_DOWNSTREAM_APPS}.")
     if representation not in MOOD_REPRESENTATIONS:

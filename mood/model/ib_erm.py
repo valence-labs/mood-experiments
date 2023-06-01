@@ -60,7 +60,6 @@ class InformationBottleneckERM(BaseModel):
         self.duration = penalty_weight_schedule[1] - penalty_weight_schedule[0]
 
     def _step(self, batch, batch_idx=0, optimizer_idx=None):
-
         phis = []
         erm_loss = 0
 
@@ -77,7 +76,6 @@ class InformationBottleneckERM(BaseModel):
         return loss
 
     def _loss(self, erm_loss, phis):
-
         if not self.training:
             return erm_loss
 

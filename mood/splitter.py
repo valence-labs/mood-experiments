@@ -28,7 +28,6 @@ MOOD_SPLITTERS = ["Random", "Scaffold", "Perimeter", "Maximum Dissimilarity"]
 
 
 def get_mood_splitters(smiles, n_splits: int = 5, random_state: int = 0, n_jobs: Optional[int] = None):
-
     scaffolds = [dm.to_smiles(dm.to_scaffold_murcko(dm.to_mol(smi))) for smi in smiles]
     splitters = {
         "Random": ShuffleSplit(n_splits=n_splits, random_state=random_state),
@@ -58,7 +57,6 @@ class SplitCharacterization:
 
     @classmethod
     def concat(cls, splits):
-
         names = set([obj.label for obj in splits])
         if len(names) != 1:
             raise RuntimeError("Can only concatenate equally labeled split characterizations")
@@ -226,7 +224,6 @@ class MOODSplitter(BaseShuffleSplit):
             it = tqdm.tqdm(it, desc="Splitter")
 
         for name, splitter in it:
-
             # We possibly repeat the split multiple times to
             # get a more reliable  estimate
             chars = []
@@ -295,7 +292,6 @@ class KMeansSplit(GroupShuffleSplit):
     def __init__(
         self, n_clusters: int = 10, n_splits: int = 5, *, test_size=None, train_size=None, random_state=None
     ):
-
         super().__init__(
             n_splits=n_splits,
             test_size=test_size,
@@ -355,7 +351,6 @@ class PerimeterSplit(KMeansSplit):
         train_size=None,
         random_state=None,
     ):
-
         super().__init__(
             n_clusters=n_clusters,
             n_splits=n_splits,
@@ -366,7 +361,6 @@ class PerimeterSplit(KMeansSplit):
         self._n_jobs = n_jobs
 
     def _iter_indices(self, X, y=None, groups=None):
-
         if groups is not None:
             logger.warning("Ignoring the groups parameter in favor of the predefined groups")
 
@@ -379,7 +373,6 @@ class PerimeterSplit(KMeansSplit):
         )
 
         for i in range(self.n_splits):
-
             groups, centers = self.compute_kmeans_clustering(X, random_state_offset=i, return_centers=True)
             centers, group_indices, group_counts = np.unique(
                 centers, return_inverse=True, return_counts=True, axis=0
@@ -399,7 +392,6 @@ class PerimeterSplit(KMeansSplit):
             remaining = set(groups_set)
 
             for pos in maximum_distance_indices:
-
                 if len(test_indices) >= n_test:
                     break
 
@@ -437,7 +429,6 @@ class MaxDissimilaritySplit(KMeansSplit):
         train_size=None,
         random_state=None,
     ):
-
         super().__init__(
             n_clusters=n_clusters,
             n_splits=n_splits,
@@ -464,7 +455,6 @@ class MaxDissimilaritySplit(KMeansSplit):
         )
 
         for i in range(self.n_splits):
-
             # We introduce some stochasticity through the k-Means clustering
             groups, centers = self.compute_kmeans_clustering(X, random_state_offset=i, return_centers=True)
             centers, group_indices, group_counts = np.unique(
@@ -492,7 +482,6 @@ class MaxDissimilaritySplit(KMeansSplit):
             # from the _initial_ test cluster.
             sorted_groups = np.argsort(distance_matrix[train_idx])
             for group_idx in sorted_groups:
-
                 if len(train_indices) >= n_train:
                     break
 

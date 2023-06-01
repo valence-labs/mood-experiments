@@ -17,7 +17,6 @@ def cli(
     base_save_dir: str = RESULTS_DIR,
     sub_save_dir: Optional[str] = None,
 ):
-
     if sub_save_dir is None:
         sub_save_dir = datetime.now().strftime("%Y%m%d")
     out_dir = dm.fs.join(base_save_dir, "dataframes", "compare_performance", sub_save_dir)

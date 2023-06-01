@@ -39,7 +39,6 @@ def representation_iterator(
     blacklist: Optional[List[str]] = None,
     batch_size: int = 16,
 ):
-
     if whitelist is not None and blacklist is not None:
         msg = "You cannot use a blacklist and whitelist at the same time"
         raise ValueError(msg)
@@ -186,7 +185,6 @@ def _charge_descriptors_fix(mol: dm.Mol):
 
 
 def compute_desc2d(smi, disable_logs: bool = False):
-
     descr_fns = {name: fn for (name, fn) in Descriptors.descList}
 
     all_features = [d[0] for d in Descriptors.descList]
@@ -236,7 +234,6 @@ def compute_maccs(smi, disable_logs: bool = False):
 
 
 def compute_chemberta(smis, disable_logs: bool = False, batch_size: int = 16):
-
     # Batch the input
     step_size = int(np.ceil(len(smis) / batch_size))
     batched = np.array_split(smis, step_size)
@@ -252,7 +249,6 @@ def compute_chemberta(smis, disable_logs: bool = False, batch_size: int = 16):
 
     hidden_states = []
     for batch in tqdm.tqdm(batched, desc="Batch"):
-
         model_input = tokenizer(
             batch.tolist(),
             return_tensors="pt",
@@ -282,7 +278,6 @@ def compute_chemberta(smis, disable_logs: bool = False, batch_size: int = 16):
 
 
 def load_graphormer(smis, disable_logs: bool = False, batch_size: int = 16):
-
     # NOTE: Since we needed to make some changes to the Graphormer repo
     #  to actually extract the embeddings, including that code in MOOD
     #  would pollute the repo quite a bit. Therefore, we precomputed the

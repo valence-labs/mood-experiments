@@ -30,7 +30,6 @@ def cli(
     overwrite: bool = False,
     skip: Optional[List[str]] = None,
 ):
-
     if skip is None:
         skip = []
 
@@ -39,7 +38,6 @@ def cli(
 
     # Precompute Graphormer for the downstream applications
     for molecule_set in [app for app in SUPPORTED_DOWNSTREAM_APPS if app not in skip]:
-
         in_path = dm.fs.join(DOWNSTREAM_APPS_DATA_DIR, f"{molecule_set}.csv")
         out_path = dm.fs.join(
             DOWNSTREAM_APPS_DATA_DIR, "representations", molecule_set, f"Graphormer.parquet"
@@ -79,7 +77,6 @@ def cli(
 
     blacklist = [app for app in MOOD_DATASETS if app in skip]
     for dataset, (smiles, _) in dataset_iterator(blacklist=blacklist, disable_logs=True):
-
         logger.info(f"Dataset {dataset}")
         out_path = dm.fs.join(DATASET_DATA_DIR, "representations", dataset, f"Graphormer.parquet")
 

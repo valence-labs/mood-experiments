@@ -157,7 +157,6 @@ def rct_predict_step(model, dataset):
 def rct_compute_metrics(
     y_true, y_pred, y_uncertainty, performance_metric, calibration_metric, is_regression, prefix, suffix
 ):
-
     prf_score = performance_metric(y_true, y_pred)
 
     # NOTE: Ideally we would always compute the calibration metric,
@@ -173,7 +172,6 @@ def rct_compute_metrics(
     }
 
     if is_regression:
-
         targets = Metric.preprocess_targets(y_true, is_regression)
         predictions = Metric.preprocess_predictions(y_pred, targets.device)
 
@@ -198,7 +196,6 @@ def rct_evaluate_step(
     suffix,
     criterion: Optional = None,
 ):
-
     val_y_pred, val_uncertainty = rct_predict_step(model, val_dataset)
     val_metrics = rct_compute_metrics(
         y_true=val_dataset.y,
@@ -255,7 +252,6 @@ def rct_tuning_loop(
     seeds = rng.integers(0, 2**16, num_trials)
 
     def run_trial(trial: optuna.Trial):
-
         random_state = seeds[trial.number].item()
         trial.set_user_attr("trial_seed", random_state)
 
@@ -263,7 +259,6 @@ def rct_tuning_loop(
         train_val_splitter = splitters[train_val_split]
 
         for split_idx, (train_ind, val_ind) in enumerate(train_val_splitter.split(train_val_dataset.X)):
-
             train_dataset, val_dataset, test_dataset_inner = rct_dataset_setup(
                 train_val_dataset, train_ind, val_ind, test_dataset, is_regression
             )

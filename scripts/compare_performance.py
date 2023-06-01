@@ -34,7 +34,6 @@ def cli(
     sub_save_dir: Optional[str] = None,
     overwrite: bool = False,
 ):
-
     if sub_save_dir is None:
         sub_save_dir = datetime.now().strftime("%Y%m%d")
     out_dir = dm.fs.join(base_save_dir, "dataframes", "compare_performance", sub_save_dir)
@@ -63,7 +62,6 @@ def cli(
     y_uncertainty = []
 
     for seed in range(n_seeds):
-
         # Randomly split the dataset
         # This ensures that the distribution of distances from val to train is relatively uniform
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=seed)
@@ -79,7 +77,6 @@ def cli(
                 params = yaml.safe_load(fd)
 
         else:
-
             # Run a hyper-parameter search
             study = basic_tuning_loop(
                 X_train=X_train,

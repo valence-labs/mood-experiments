@@ -18,7 +18,6 @@ def plot_performance_over_distance(
     show_xlabel: bool = True,
     show_ylabel: bool = True,
 ):
-
     if ax is None:
         _, ax = plt.subplots(figsize=(12, 6))
 
@@ -81,7 +80,6 @@ def plot_distance_distributions(
     ax: Optional = None,
     outlier_factor: Optional[float] = 3.0,
 ):
-
     n = len(distances)
     show_legend = True
 
@@ -128,7 +126,6 @@ def axes_grid_iterator(
     fontsize: int = 24,
     margin: float = 0.25,
 ):
-
     ncols = len(col_labels)
     nrows = len(row_labels)
 

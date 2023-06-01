@@ -11,7 +11,6 @@ from mood.preprocessing import DEFAULT_PREPROCESSING
 
 
 def save(distances, compounds, molecule_set, dataset, representation, overwrite):
-
     out_path = dm.fs.join(
         DOWNSTREAM_APPS_DATA_DIR, "distances", molecule_set, dataset, f"{representation}.parquet"
     )
@@ -29,14 +28,12 @@ def cli(
     dataset: Optional[List[str]] = None,
     verbose: bool = False,
 ):
-
     if len(dataset) == 0:
         dataset = None
     if len(representation) == 0:
         representation = None
 
     for dataset, (smiles, y) in dataset_iterator(whitelist=dataset, disable_logs=True):
-
         it = representation_iterator(
             smiles,
             standardize_fn=DEFAULT_PREPROCESSING,
@@ -47,7 +44,6 @@ def cli(
         )
 
         for representation, (X, mask) in it:
-
             virtual_screening, vs_compounds = load_representation_for_downstream_application(
                 "virtual_screening",
                 representation,

@@ -19,7 +19,6 @@ def cli(
     use_cache: bool = True,
     seed: Optional[int] = None,
 ):
-
     logger.info(f"Loading precomputed distances for virtual screening")
     distances_vs = load_distances_for_downstream_application(
         "virtual_screening", representation, dataset, update_cache=not use_cache
