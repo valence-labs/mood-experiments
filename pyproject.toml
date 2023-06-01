@@ -1,12 +1,72 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mood"
+description = "A python library to accompany the MOOD paper from Tossou et al. (2023)"
+authors = [{ name = "Cas Wognum", email = "cas@valencediscovery.com" }]
+readme = "README.md"
+dynamic = ["version"]
+requires-python = ">=3.10,<3.11"
+license = { text = "Apache" }
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Healthcare Industry",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+]
+
+dependencies = [
+    "pandas",
+    "matplotlib",
+    "scikit-learn",
+    "torchmetrics",
+    "pytorch-lightning <2.0",
+    "torch >=1.10.2",
+    "numpy <1.24",
+    "tqdm",
+    "optuna",
+    "datamol",
+    "notebook",
+    "pytdc",
+    "typer",
+    "gcsfs",
+    "pyarrow",
+    "fastparquet",
+    "transformers",
+]
+
+[project.scripts]
+mood = "mood.__main__:app"
+
 [tool.black]
 line-length = 110
-target-version = ['py38', 'py39']
+target-version = ['py310']
 include = '\.pyi?$'
 
-[tool.pytest.ini_options]
-minversion = "6.0"
-addopts = "--verbose --cov=mood --cov-report xml --cov-report term"
-testpaths = ["tests"]
+[project.urls]
+"Source Code" = "https://github.com/cwognum/mood-experiments/tree/main"
+"Paper" = "TODO"
 
-[tool.coverage.run]
-omit = ["setup.py", "tests/*"] 
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools_scm]
+fallback_version = "dev"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mood", "mood.*", "scripts", "scripts.*"]
+exclude = []
+namespaces = true
+
