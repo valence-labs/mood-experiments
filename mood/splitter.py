@@ -201,7 +201,7 @@ class MOODSplitter(BaseShuffleSplit):
     def get_protocol_results(self):
         return SplitCharacterization.as_dataframe(self._split_chars)
 
-    def fit(self, X, y=None, groups=None, X_downstream=None, plot: bool = False, progress: bool = False):
+    def fit(self, X, y=None, groups=None, X_deployment=None, plot: bool = False, progress: bool = False):
         """Follows the MOOD specification to prescribe a train-test split
         that is most representative of downstream applications.
 
@@ -213,7 +213,7 @@ class MOODSplitter(BaseShuffleSplit):
         """
 
         if self._downstream_distances is None:
-            self._downstream_distances = self._compute_distance(X_downstream, X)
+            self._downstream_distances = self._compute_distance(X_deployment, X)
 
         # Precompute all splits. Since splitters are implemented as generators,
         # we store the resulting splits so we can replicate them later on.
