@@ -9,7 +9,8 @@
 ---
 
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![DOI]()]()
+[![DOI](https://img.shields.io/badge/DOI-10.26434%2Fchemrxiv--2023--q11q4-blue)](https://doi.org/10.26434/chemrxiv-2023-q11q4)
+
 
 Python repository with all the code that was used for the MOOD paper.
 
@@ -39,35 +40,39 @@ All data has been made available in a public GCP bucket. See [`gs://mood-data-pu
 - `notebooks/`: Notebooks were used to visualize and otherwise explore the results. All plots in the paper can be reproduced through these notebooks.
 - `scripts/`: Generally more messy pieces of code that were used to generate (intermediate) results.
 
-## Use the MOOD protocol
+## Use the MOOD splitting protocol
 <div align="center">
-    <img src="docs/images/protocol.png" width="80%">
+    <img src="docs/images/protocol.png" width="100%">
 </div>
 
 One of the main results of the MOOD paper, is the MOOD protocol. This protocol helps to close the testing-deployment gap in molecular scoring by finding the most representative splitting method. To make it easy for others to experiment with this protocol, we made an effort to make it easy to use.
 
 ```python
 import datamol as dm
+import numpy as np
 from sklearn.model_selection import ShuffleSplit
 from mood.splitter import PerimeterSplit, MaxDissimilaritySplit, PredefinedGroupShuffleSplit, MOODSplitter
 
 # Load your data
-smiles = ...
-X = ...
-y = ...
+data = dm.data.freesolv()
+smiles = data["smiles"].values
+X = np.stack([dm.to_fp(dm.to_mol(smi)) for smi in smiles])
+y = data["expt"].values
 
 # Load your deployment data
-X_deployment = ...
+X_deployment = np.random.random((100, 2048)).round()
 
+# Set-up your candidate splitting methods
 scaffolds = [dm.to_smiles(dm.to_scaffold_murcko(dm.to_mol(smi))) for smi in smiles]
 candidate_splitters = {
-    "Random": ShuffleSplit(),
-    "Scaffold": PredefinedGroupShuffleSplit(groups=scaffolds),
-    "Perimeter": PerimeterSplit(),
-    "Maximum Dissimilarity": MaxDissimilaritySplit(),
+    "Random": ShuffleSplit(n_splits=5),  # MOOD is Scikit-learn compatible!
+    "Scaffold": PredefinedGroupShuffleSplit(groups=scaffolds, n_splits=5),
+    "Perimeter": PerimeterSplit(n_splits=5),
+    "Maximum Dissimilarity": MaxDissimilaritySplit(n_splits=5),
 }
 
-mood_splitter = MOODSplitter(candidate_splitters)
+# Set-up the MOOD splitter
+mood_splitter = MOODSplitter(candidate_splitters, metric="jaccard")
 mood_splitter.fit(X, y, X_deployment=X_deployment)
 
 for train, test in mood_splitter.split(X, y):
@@ -76,9 +81,12 @@ for train, test in mood_splitter.split(X, y):
 ```
 
 ## How to cite
-Please cite MOOD if you use it in your research: [![DOI]()]()
+Please cite MOOD if you use it in your research: [![DOI](https://img.shields.io/badge/DOI-10.26434%2Fchemrxiv--2023--q11q4-blue)](https://doi.org/10.26434/chemrxiv-2023-q11q4)
 
 ```
-# TODO: Bibtex
+Tossou P, Wognum C, Craig M, Mary H, Noutahi E. 
+Real-World Molecular Out-Of-Distribution: Specification and Investigation. 
+ChemRxiv. Cambridge: Cambridge Open Engage; 2023; 
+This content is a preprint and has not been peer-reviewed.
 ```
 
