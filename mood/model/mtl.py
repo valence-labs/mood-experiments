@@ -59,7 +59,6 @@ class MTL(BaseModel):
         return out
 
     def _step(self, batch, batch_idx=0, optimizer_idx=None):
-
         xs = torch.cat([xs for (xs, _), _ in batch], dim=0)
         domains = torch.cat([ds for (_, ds), _ in batch], dim=0)
         y_true = torch.cat([ys for _, ys in batch], dim=0)

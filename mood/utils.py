@@ -19,7 +19,6 @@ def load_representation_for_downstream_application(
     update_cache: bool = False,
     return_compound_ids: bool = False,
 ):
-
     suffix = ["representations", name, f"{representation}.parquet"]
 
     lpath = dm.fs.join(CACHE_DIR, "downstream_applications", *suffix)
@@ -50,7 +49,6 @@ def load_distances_for_downstream_application(
     update_cache: bool = False,
     return_compound_ids: bool = False,
 ):
-
     suffix = ["distances", name, dataset, f"{representation}.parquet"]
 
     lpath = dm.fs.join(CACHE_DIR, "downstream_applications", *suffix)
@@ -74,7 +72,6 @@ def load_distances_for_downstream_application(
 
 
 def save_figure_with_fsspec(path, exist_ok=False):
-
     if dm.fs.exists(path) and not exist_ok:
         raise RuntimeError(f"{path} already exists")
 
@@ -97,7 +94,6 @@ def save_figure_with_fsspec(path, exist_ok=False):
 
 
 def get_outlier_bounds(X, factor: float = 1.5):
-
     q1 = np.quantile(X, 0.25)
     q3 = np.quantile(X, 0.75)
     iqr = q3 - q1
@@ -109,7 +105,6 @@ def get_outlier_bounds(X, factor: float = 1.5):
 
 
 def bin_with_overlap(data, filter_outliers: bool = True):
-
     if filter_outliers:
         minimum, maximum = get_outlier_bounds(data)
         window_size = (maximum - minimum) / 10
@@ -133,7 +128,6 @@ def bin_with_overlap(data, filter_outliers: bool = True):
 
 
 def get_mask_for_distances_or_representations(X):
-
     # The 1e4 threshold is somewhat arbitrary, but manually chosen to
     # filter out compounds that don't make sense (and are outliers).
     # (e.g. WHIM for [C-]#N.[C-]#N.[C-]#N.[C-]#N.[C-]#N.[Fe+4].[N-]=O)

@@ -75,7 +75,6 @@ class CORAL(BaseModel):
         return loss
 
     def _loss(self, y_pred, y_true, phis_src: Optional = None, phis_tgt: Optional = None):
-
         erm_loss = self.loss_fn(y_pred, y_true)
 
         if not self.training:

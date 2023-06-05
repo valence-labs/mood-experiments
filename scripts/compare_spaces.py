@@ -50,7 +50,6 @@ def train_gp(X, y, is_regression):
 
 
 def get_model_space_distances(model, train, queries):
-
     embedding_size = int(round(train.shape[1] * 0.25))
     trans = ModelSpaceTransformer(model, embedding_size)
 
@@ -62,7 +61,6 @@ def get_model_space_distances(model, train, queries):
 
 
 def compute_correlations(input_spaces, model_spaces, labels):
-
     lower, upper = get_outlier_bounds(np.concatenate(input_spaces), factor=3.0)
     input_masks = [(X >= lower) & (X <= upper) for X in input_spaces]
 
@@ -75,7 +73,6 @@ def compute_correlations(input_spaces, model_spaces, labels):
 
     df = pd.DataFrame()
     for input_space, model_space, label in zip(input_spaces, model_spaces, labels):
-
         df_ = pd.DataFrame(
             {
                 "pearson": pearsonr(input_space, model_space)[0],
@@ -97,7 +94,6 @@ def cli(
     skip_dataset: Optional[List[str]] = None,
     batch_size: int = 16,
 ):
-
     if sub_save_dir is None:
         sub_save_dir = datetime.now().strftime("%Y%m%d")
 
@@ -121,7 +117,6 @@ def cli(
     dataset_it = dataset_iterator(blacklist=skip_dataset)
 
     for dataset, (smiles, y) in dataset_it:
-
         representation_it = representation_iterator(
             smiles,
             n_jobs=-1,
@@ -132,7 +127,6 @@ def cli(
         )
 
         for representation, (X, mask) in representation_it:
-
             y_repr = y[mask]
 
             virtual_screening = load_representation_for_downstream_application(
@@ -168,7 +162,6 @@ def cli(
 
             # Distances in different model spaces
             for name, model in {"MLP": mlp_model, "RF": rf_model, "GP": gp_model}.items():
-
                 if model is None:
                     logger.warning(f"Failed to train a {name} model for {dataset} on {representation}")
                     continue

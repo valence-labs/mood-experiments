@@ -30,7 +30,6 @@ def cli(
     overwrite: bool = False,
     n_jobs: Optional[int] = None,
 ):
-
     df = pd.DataFrame()
 
     if sub_save_dir is None:
@@ -44,7 +43,6 @@ def cli(
 
     dataset_it = dataset_iterator(blacklist=skip_dataset)
     for dataset, (smiles, y) in dataset_it:
-
         representation_it = representation_iterator(
             smiles,
             n_jobs=n_jobs,
@@ -55,7 +53,6 @@ def cli(
         )
 
         for representation, (X, mask) in representation_it:
-
             logger.info(f"Loading precomputed distances for virtual screening")
             distances_vs = load_distances_for_downstream_application(
                 "virtual_screening", representation, dataset, update_cache=not use_cache

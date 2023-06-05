@@ -50,7 +50,6 @@ def compute_knn_distance(
 
     distances, indices = [], []
     for queries in Y:
-
         if np.array_equal(X, queries):
             # Use k + 1 and filter out the first
             # because the sample will always be its own neighbor

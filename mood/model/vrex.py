@@ -61,7 +61,6 @@ class VREx(BaseModel):
         self.duration = penalty_weight_schedule[1] - penalty_weight_schedule[0]
 
     def _step(self, batch, batch_idx=0, optimizer_idx=None):
-
         erm_losses = []
         for mini_batch in batch:
             (xs, _), y_true = mini_batch

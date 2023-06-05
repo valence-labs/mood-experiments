@@ -81,7 +81,6 @@ class DANN(BaseModel):
 
     @staticmethod
     def get_optimizer(parameters, lr, weight_decay, monitor: str = "val_loss"):
-
         if weight_decay == "auto":
             parameters, parameters_copy = tee(parameters)
             weight_decay = 1.0 / sum(p.numel() for p in parameters_copy if p.requires_grad)
@@ -100,7 +99,6 @@ class DANN(BaseModel):
         }
 
     def configure_optimizers(self):
-
         optimizer_predictor = self.get_optimizer(
             chain(self.base_network.parameters(), self.prediction_head.parameters()),
             self.lr,
@@ -136,7 +134,6 @@ class DANN(BaseModel):
         return ret
 
     def _step(self, batch, batch_idx=0, optimizer_idx=None):
-
         if not self.training:
             (x, domains), y_true = batch
             y_pred = self.forward(x)

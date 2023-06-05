@@ -15,7 +15,6 @@ def linear_interpolation(step, duration, max_value, start: int = 0, min_value: f
 
 
 def get_activation(activation_spec):
-
     if isinstance(activation_spec, Callable):
         return activation_spec
     if activation_spec is None:

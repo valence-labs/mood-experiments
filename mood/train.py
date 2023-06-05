@@ -63,7 +63,6 @@ def train_torch_model(
     seed: Optional[int] = None,
     ensemble_size: int = 5,
 ):
-
     logging.getLogger("pytorch_lightning").setLevel(logging.WARNING)
     seed_everything(seed, workers=True)
 
@@ -78,7 +77,6 @@ def train_torch_model(
 
     models = []
     for i in range(ensemble_size):
-
         base = get_simple_mlp(len(train_dataset.X[0]), width, depth, out_size=None)
         head = get_simple_mlp(
             input_size=width * 2 if algorithm == "MTL" else width, is_regression=is_regression
@@ -151,7 +149,6 @@ def train(
     #  In this case, we want to use the torch implementation.
 
     if algorithm in MOOD_DA_DG_ALGORITHMS:
-
         if calibrate:
             raise NotImplementedError("We only support calibration for scikit-learn models")
 

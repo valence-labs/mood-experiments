@@ -73,7 +73,6 @@ class Mixup(BaseModel):
         self.duration = penalty_weight_schedule[1] - penalty_weight_schedule[0]
 
     def _step(self, batch, batch_idx=0, optimizer_idx=None):
-
         if not self.training:
             (x, domains), y_true = batch
             y_pred = self.forward(x)
@@ -118,7 +117,6 @@ class Mixup(BaseModel):
         return torch.atleast_1d(pseudo_labels)
 
     def _loss(self, x_src, x_tgt, y_src, y_tgt, inter_domain: bool):
-
         lam = self.distribution_lambda.sample()
         lam_prime = torch.max(lam, 1.0 - lam)
 
@@ -127,7 +125,6 @@ class Mixup(BaseModel):
         y_pred_st, phi_st = self.forward(x_st, return_embedding=True)
 
         if inter_domain:
-
             # Predictive loss
             loss_q = self.loss_fn(y_pred_st, y_st)
 
