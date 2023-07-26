@@ -9,10 +9,10 @@
 ---
 
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![DOI](https://img.shields.io/badge/DOI-10.26434%2Fchemrxiv--2023--q11q4-blue)](https://doi.org/10.26434/chemrxiv-2023-q11q4)
+[![DOI](https://img.shields.io/badge/DOI-10.26434%2Fchemrxiv--2023--q11q4--v2-blue)](https://doi.org/10.26434/chemrxiv-2023-q11q4-v2)
 
 
-Python repository with all the code that was used for the MOOD paper.
+Python repository with all the code that was used for the [MOOD paper](https://doi.org/10.26434/chemrxiv-2023-q11q4-v2).
 
 ## Setup
 We recommend you to use `mamba` ([learn more](https://github.com/mamba-org/mamba)).
@@ -81,7 +81,7 @@ for train, test in mood_splitter.split(X, y):
 ```
 
 ## How to cite
-Please cite MOOD if you use it in your research: [![DOI](https://img.shields.io/badge/DOI-10.26434%2Fchemrxiv--2023--q11q4-blue)](https://doi.org/10.26434/chemrxiv-2023-q11q4)
+Please cite MOOD if you use it in your research: [![DOI](https://img.shields.io/badge/DOI-10.26434%2Fchemrxiv--2023--q11q4--v2-blue)](https://doi.org/10.26434/chemrxiv-2023-q11q4-v2)
 
 ```
 Tossou P, Wognum C, Craig M, Mary H, Noutahi E. 
