@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 from typing import Optional, Union, List
 
@@ -12,6 +13,8 @@ def get_distance_metric(example):
     metric = "euclidean"
 
     # For binary vectors we use jaccard
+    if isinstance(example, pd.DataFrame):
+        example = example.values  # DataFrames would require all().all() otherwise
     if ((example == 0) | (example == 1)).all():
         metric = "jaccard"
 
