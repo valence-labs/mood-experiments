@@ -9,10 +9,10 @@
 ---
 
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![DOI](https://img.shields.io/badge/DOI-10.26434%2Fchemrxiv--2023--q11q4--v2-blue)](https://doi.org/10.26434/chemrxiv-2023-q11q4-v2)
+[![DOI](https://img.shields.io/badge/DOI-10.1021%2Facs--jcim--3c01774-blue)](https://doi.org/10.1021/acs.jcim.3c01774)
 
 
-Python repository with all the code that was used for the [MOOD paper](https://doi.org/10.26434/chemrxiv-2023-q11q4-v2).
+Python repository with all the code that was used for the [MOOD paper](https://doi.org/10.1021/acs.jcim.3c01774).
 
 ## Setup
 We recommend you to use `mamba` ([learn more](https://github.com/mamba-org/mamba)).
@@ -81,12 +81,12 @@ for train, test in mood_splitter.split(X, y):
 ```
 
 ## How to cite
-Please cite MOOD if you use it in your research: [![DOI](https://img.shields.io/badge/DOI-10.26434%2Fchemrxiv--2023--q11q4--v2-blue)](https://doi.org/10.26434/chemrxiv-2023-q11q4-v2)
+Please cite MOOD if you use it in your research: [![DOI](https://img.shields.io/badge/DOI-10.1021%2Facs--jcim--3c01774-blue)](https://doi.org/10.1021/acs.jcim.3c01774)
 
 ```
-Tossou P, Wognum C, Craig M, Mary H, Noutahi E. 
-Real-World Molecular Out-Of-Distribution: Specification and Investigation. 
-ChemRxiv. Cambridge: Cambridge Open Engage; 2023; 
-This content is a preprint and has not been peer-reviewed.
+Real-World Molecular Out-Of-Distribution: Specification and Investigation
+Prudencio Tossou, Cas Wognum, Michael Craig, Hadrien Mary, and Emmanuel Noutahi
+Journal of Chemical Information and Modeling 2024 64 (3), 697-711
+DOI: 10.1021/acs.jcim.3c01774
 ```
 
