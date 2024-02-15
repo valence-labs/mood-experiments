@@ -90,3 +90,19 @@ Journal of Chemical Information and Modeling 2024 64 (3), 697-711
 DOI: 10.1021/acs.jcim.3c01774
 ```
 
+```bib
+@article{doi:10.1021/acs.jcim.3c01774,
+  author = {Tossou, Prudencio and Wognum, Cas and Craig, Michael and Mary, Hadrien and Noutahi, Emmanuel},
+  title = {Real-World Molecular Out-Of-Distribution: Specification and Investigation},
+  journal = {Journal of Chemical Information and Modeling},
+  volume = {64},
+  number = {3},
+  pages = {697-711},
+  year = {2024},
+  doi = {10.1021/acs.jcim.3c01774},
+  note = {PMID: 38300258},
+  URL = {https://doi.org/10.1021/acs.jcim.3c01774},
+  eprint = {https://doi.org/10.1021/acs.jcim.3c01774}
+}
+```
+
