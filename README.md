@@ -33,7 +33,7 @@ mood --help
 ```
 
 ### Data
-All data has been made available in a public GCP bucket. See [`gs://mood-data-public`](https://storage.googleapis.com/mood-data-public/).
+All data has been made available in a public bucket. See [`https://storage.valencelabs.com/mood-data/`](https://storage.valencelabs.com/mood-data/).
 
 ### Code
 - `mood/`: This is the main part of the codebase. It contains Python implementations of several reusable components and defines the CLI.
